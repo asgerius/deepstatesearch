@@ -1,0 +1,6 @@
+[flake8]
+max-line-length = 125
+exclude = tests/*
+
+ignore =
+    E305  ; Two empty lines between functions and classes
