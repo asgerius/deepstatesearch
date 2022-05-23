@@ -1,4 +1,4 @@
-pelutils==1.0
+pelutils>=1.1
 pytorch>=1.10
 numpy>=1.21
 matplotlib>=3.5
