@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pelutils
 from pelutils import log, TickTock
-from pelutils.parser import Flag, Option, Parser
+from pelutils.parser import Option, Parser
 
 from deepspeedcube.train.train import train
 
@@ -12,7 +12,6 @@ options = (
     Option("num-residual-blocks", default=4),
     Option("residual-size", default=1024),
     Option("dropout", default=0),
-    Flag("fp16"),
 )
 
 if __name__ == "__main__":

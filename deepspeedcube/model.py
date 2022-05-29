@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
-from pelutils import DataStorage
+from pelutils.datastorage import DataStorage
 
 
 @dataclass
@@ -16,12 +16,11 @@ class ModelConfig(DataStorage, json_name="model_config.json", indent=4):
     residual_size: int
     dropout: float
 
-
 class _BaseModel(abc.ABC, nn.Module):
     def __init__(self, cfg: ModelConfig):
-        super(nn.Module, self).__init__()
+        super().__init__()
         self.cfg = cfg
-        self.buid_model()
+        self.build_model()
 
     @abc.abstractmethod
     def build_model(self):
@@ -81,7 +80,7 @@ class _ResidualBlock(_BaseModel):
                 nn.Linear(self.cfg.residual_size, self.cfg.residual_size)
             )
             if i < self.num_layers - 1:
-                fully_connected.append(
+                fully_connected.extend(
                     self.activation_transform_layers(self.cfg.residual_size)
                 )
         self.fully_connected = nn.Sequential(*fully_connected)
