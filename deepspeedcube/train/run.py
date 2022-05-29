@@ -8,7 +8,10 @@ from deepspeedcube.train.train import train
 
 options = (
     Option("env", default="cube"),
-    Option("hidden-layers", abbrv="H", default=[4096, 2048, 512], type=int, nargs=0),
+    Option("hidden-layer-sizes", default=[4096, 1024], type=int, nargs=0),
+    Option("num-residual-blocks", default=4),
+    Option("residual-size", default=1024),
+    Option("dropout", default=0),
     Flag("fp16"),
 )
 
