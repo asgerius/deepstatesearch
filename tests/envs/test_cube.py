@@ -1,6 +1,8 @@
-from deepspeedcube.envs import get_env
+import random
 
-import numpy as np
+import torch
+
+from deepspeedcube.envs import get_env
 
 
 env = get_env("cube")
@@ -13,22 +15,22 @@ def test_reverse_move():
     # Test that applying moves and then reverse moves always
     # ends up in the original state
     for _ in range(10):
-        state = np.random.randint(0, 24, 20, dtype=np.uint8)
-        orig_state = state.copy()
-        actions = [np.random.choice(env.action_space) for j in range(100)]
+        state = torch.randint(0, 24, (20,), dtype=torch.uint8)
+        orig_state = state.clone()
+        actions = [random.choice(env.action_space) for _ in range(100)]
         reverse_actions = [env.reverse_move(action) for action in actions][::-1]
         for action in actions:
             state = env.move(action, state)
         for action in reverse_actions:
             state = env.move(action, state)
-        assert np.all(state == orig_state)
+        assert torch.all(state == orig_state)
         assert state.dtype == orig_state.dtype
 
 def test_reverse_moves():
-    actions = np.array([np.random.choice(env.action_space) for _ in range(10)], dtype=np.uint8)
-    reverse_actions = np.array([env.reverse_move(a) for a in actions], dtype=np.uint8)
+    actions = torch.Tensor([random.choice(env.action_space) for _ in range(10)]).to(torch.uint8)
+    reverse_actions = torch.Tensor([env.reverse_move(a) for a in actions]).to(torch.uint8)
     reverse_actions2 = env.reverse_moves(actions)
-    assert np.all(reverse_actions == reverse_actions2)
+    assert torch.all(reverse_actions == reverse_actions2)
     assert reverse_actions.dtype == reverse_actions2.dtype
 
 def test_move():
@@ -92,10 +94,10 @@ def test_move():
     ])
 
 def test_multiple_moves():
-    states = np.vstack([env.get_solved()]*len(env.action_space))
+    states = torch.vstack([env.get_solved()]*len(env.action_space))
     for i, action in enumerate(env.action_space):
         states[i] = env.move(action, states[i])
 
-    states2 = np.vstack([env.get_solved()]*len(env.action_space))
+    states2 = torch.vstack([env.get_solved()]*len(env.action_space))
     states2 = env.multiple_moves(env.action_space, states2)
-    assert np.all(states == states2)
+    assert torch.all(states == states2)

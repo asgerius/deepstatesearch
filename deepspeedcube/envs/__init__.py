@@ -5,7 +5,11 @@ import ctypes
 from typing import Type
 
 import numpy as np
+import torch
+import torch.nn.functional as F
 from pelutils import c_ptr
+
+from deepspeedcube import device
 
 
 _CUBELIB = ctypes.cdll.LoadLibrary("lib/cube.so")
@@ -13,46 +17,60 @@ _CUBELIB = ctypes.cdll.LoadLibrary("lib/cube.so")
 class BaseEnvironment(abc.ABC):
 
     dtype: type
-    action_space: np.ndarray
+    action_space: torch.Tensor
     state_oh_size: int
-    _solved_state: np.ndarray
+    _solved_state: torch.Tensor
 
     @classmethod
-    def get_solved(cls) -> np.ndarray:
-        return cls._solved_state.copy()
+    def get_solved(cls) -> torch.Tensor:
+        return cls._solved_state.clone()
 
     @classmethod
-    def is_solved(cls, state: np.ndarray) -> bool:
-        return np.all(state == cls._solved_state)
+    def is_solved(cls, state: torch.Tensor) -> bool:
+        return torch.all(state == cls._solved_state)
 
     @abc.abstractclassmethod
-    def move(cls, action: int, state: np.ndarray) -> np.ndarray:
+    def move(cls, action: int, state: torch.Tensor) -> torch.Tensor:
         pass
 
     @abc.abstractclassmethod
-    def multiple_moves(cls, actions: np.ndarray, states: np.ndarray) -> np.ndarray:
+    def multiple_moves(cls, actions: torch.Tensor, states: torch.Tensor) -> torch.Tensor:
         pass
+
+    @classmethod
+    def oh(cls, state: torch.Tensor) -> torch.Tensor:
+        return F.one_hot(
+            state,
+            num_classes=cls.state_oh_size // len(cls._solved_state),
+        ).reshape(1, -1)
+
+    @classmethod
+    def multiple_oh(cls, states: torch.Tensor) -> torch.Tensor:
+        return F.one_hot(
+            states,
+            num_classes=cls.state_oh_size // len(cls._solved_state),
+        ).reshape(len(states), -1)
 
     @abc.abstractclassmethod
     def reverse_move(cls, action: int) -> int:
         pass
 
     @abc.abstractclassmethod
-    def reverse_moves(cls, actions: np.ndarray) -> np.ndarray:
+    def reverse_moves(cls, actions: torch.Tensor) -> torch.Tensor:
         pass
 
     @abc.abstractclassmethod
-    def string(cls, state: np.ndarray) -> str:
+    def string(cls, state: torch.Tensor) -> str:
         pass
 
 class _CubeEnvironment(BaseEnvironment):
 
-    dtype = np.uint8
-    action_space = np.arange(12, dtype=np.uint8)
+    dtype = torch.uint8
+    action_space = torch.arange(12, dtype=torch.uint8)
     state_oh_size = 480
-    _solved_state = np.array([
+    _solved_state = torch.Tensor([
         0, 3, 6, 9, 12, 15, 18, 21,
-        0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22], dtype=dtype)
+        0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22], device=device).to(dtype)
 
     # If the six sides are represented by an array, the order should be F, B, T, D, L, R
     F, B, T, D, L, R = 0, 1, 2, 3, 4, 5
@@ -82,18 +100,19 @@ class _CubeEnvironment(BaseEnvironment):
     )
 
     @classmethod
-    def move(cls, action: int, state: np.ndarray) -> np.ndarray:
-        new_state = state.copy()
+    def move(cls, action: int, state: torch.Tensor) -> torch.Tensor:
+        new_state = state.clone()
+        action = torch.Tensor([action]).to(cls.dtype)
         _CUBELIB.multi_act(
             c_ptr(new_state),
-            c_ptr(np.array([action], dtype=np.uint8)),
+            c_ptr(action),
             1,
         )
         return new_state
 
     @classmethod
-    def multiple_moves(cls, actions: np.ndarray, states: np.ndarray) -> np.ndarray:
-        new_states = states.copy()
+    def multiple_moves(cls, actions: torch.Tensor, states: torch.Tensor) -> torch.Tensor:
+        new_states = states.clone()
         _CUBELIB.multi_act(
             c_ptr(new_states),
             c_ptr(actions),
@@ -106,15 +125,16 @@ class _CubeEnvironment(BaseEnvironment):
         return action + 6 if action < 6 else action - 6
 
     @classmethod
-    def reverse_moves(cls, actions: np.ndarray) -> np.ndarray:
+    def reverse_moves(cls, actions: torch.Tensor) -> torch.Tensor:
         pos_dir = actions >= 6
         actions = actions + 6
         actions[pos_dir] -= 12
         return actions
 
     @classmethod
-    def _as633(cls, state: np.ndarray) -> np.ndarray:
+    def _as633(cls, state: torch.Tensor) -> np.ndarray:
 
+        state = state.numpy()
         state633 = (np.ones((3, 3, 6)) * np.arange(6)).transpose(2, 1, 0).astype(int)
         for i in range(8):
             # Inserts values for corner i in position pos
@@ -146,7 +166,7 @@ class _CubeEnvironment(BaseEnvironment):
             [-1, cls.T, -1, -1],
             [cls.L, cls.F, cls.R, cls.B],
             [-1, cls.D, -1, -1],
-        ])
+        ], dtype=int)
         for i in range(6):
             pos = tuple(int(x) for x in np.where(simple == i))
             stringarr[pos[0] * 3: pos[0] * 3 + 3, pos[1] * 3: pos[1] * 3 + 3] = state633[i].astype(str)
@@ -154,7 +174,7 @@ class _CubeEnvironment(BaseEnvironment):
         return string
 
     @classmethod
-    def string(cls, state: np.ndarray) -> str:
+    def string(cls, state: torch.Tensor) -> str:
         return cls._stringify_cube(cls._as633(state))
 
 _ENVS = {
