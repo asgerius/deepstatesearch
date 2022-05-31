@@ -7,7 +7,7 @@ from pelutils.datastorage import DataStorage
 from pelutils.parser import JobDescription
 
 from deepspeedcube.model import Model, ModelConfig
-from deepspeedcube.train import get_env
+from deepspeedcube.envs import get_env
 
 
 @dataclass
@@ -28,7 +28,7 @@ def train(job: JobDescription):
 
     log("Building model")
     model_cfg = ModelConfig(
-        state_size          = env.state_size,
+        state_size          = env.state_oh_size,
         hidden_layer_sizes  = job.hidden_layer_sizes,
         num_residual_blocks = job.num_residual_blocks,
         residual_size       = job.residual_size,
@@ -39,5 +39,3 @@ def train(job: JobDescription):
     with TT.profile("Building model"):
         model = Model(model_cfg)
     log("Build model", "Number of parameters: %s" % thousands_seperators(model.numel()))
-
-    log("Time distribution", TT)

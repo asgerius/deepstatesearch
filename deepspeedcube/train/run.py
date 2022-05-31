@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import pelutils
-from pelutils import log, TickTock
+from pelutils import log, TT
 from pelutils.parser import Option, Parser
 
 from deepspeedcube.train.train import train
@@ -19,11 +18,11 @@ if __name__ == "__main__":
     job_descriptions = parser.parse_args()
     for i, job in enumerate(job_descriptions):
         # Reset global tick tock instance for new job
-        pelutils.TT = TickTock()
+        TT.reset()
         log.configure(f"{job.location}/train.log")
         with log.log_errors:
             log.section(f"Training {i+1} / {len(job_descriptions)}")
             train(job)
-            log.debug("Time distribution", pelutils.TT)
+            log.debug("Time distribution", TT)
 
     parser.document()
