@@ -4,6 +4,7 @@ exclude = tests/*
 
 ignore =
     E221  ; Allow alignment of arguments
+    E241
     E251
     E302  ; Two empty lines between classes and classes
     E305  ; Two empty lines between functions and classes
