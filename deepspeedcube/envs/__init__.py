@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import ctypes
+from typing import Type
 
 import numpy as np
 from pelutils import c_ptr
@@ -11,7 +12,18 @@ _CUBELIB = ctypes.cdll.LoadLibrary("lib/cube.so")
 
 class BaseEnvironment(abc.ABC):
 
+    dtype: type
+    action_space: np.ndarray
     state_oh_size: int
+    _solved_state: np.ndarray
+
+    @classmethod
+    def get_solved(cls) -> np.ndarray:
+        return cls._solved_state.copy()
+
+    @classmethod
+    def is_solved(cls, state: np.ndarray) -> bool:
+        return np.all(state == cls._solved_state)
 
     @abc.abstractclassmethod
     def move(cls, action: int, state: np.ndarray) -> np.ndarray:
@@ -21,9 +33,53 @@ class BaseEnvironment(abc.ABC):
     def multiple_moves(cls, actions: np.ndarray, states: np.ndarray) -> np.ndarray:
         pass
 
+    @abc.abstractclassmethod
+    def reverse_move(cls, action: int) -> int:
+        pass
+
+    @abc.abstractclassmethod
+    def reverse_moves(cls, actions: np.ndarray) -> np.ndarray:
+        pass
+
+    @abc.abstractclassmethod
+    def string(cls, state: np.ndarray) -> str:
+        pass
+
 class _CubeEnvironment(BaseEnvironment):
 
+    dtype = np.uint8
+    action_space = np.arange(12, dtype=np.uint8)
     state_oh_size = 480
+    _solved_state = np.array([
+        0, 3, 6, 9, 12, 15, 18, 21,
+        0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22], dtype=dtype)
+
+    # If the six sides are represented by an array, the order should be F, B, T, D, L, R
+    F, B, T, D, L, R = 0, 1, 2, 3, 4, 5
+    corner_633map = (
+        ((F, 0, 0), (L, 0, 2), (T, 2, 0)),
+        ((F, 2, 0), (D, 0, 0), (L, 2, 2)),
+        ((F, 2, 2), (R, 2, 0), (D, 0, 2)),
+        ((F, 0, 2), (T, 2, 2), (R, 0, 0)),
+        ((B, 0, 2), (T, 0, 0), (L, 0, 0)),
+        ((B, 2, 2), (L, 2, 0), (D, 2, 0)),
+        ((B, 2, 0), (D, 2, 2), (R, 2, 2)),
+        ((B, 0, 0), (R, 0, 2), (T, 0, 2)),
+    )
+    side_633map = (
+        ((F, 0, 1), (T, 2, 1)),
+        ((F, 1, 0), (L, 1, 2)),
+        ((F, 2, 1), (D, 0, 1)),
+        ((F, 1, 2), (R, 1, 0)),
+        ((T, 1, 0), (L, 0, 1)),
+        ((D, 1, 0), (L, 2, 1)),
+        ((D, 1, 2), (R, 2, 1)),
+        ((T, 1, 2), (R, 0, 1)),
+        ((B, 0, 1), (T, 0, 1)),
+        ((B, 1, 2), (L, 1, 0)),
+        ((B, 2, 1), (D, 2, 1)),
+        ((B, 1, 0), (R, 1, 2)),
+    )
 
     @classmethod
     def move(cls, action: int, state: np.ndarray) -> np.ndarray:
@@ -45,9 +101,65 @@ class _CubeEnvironment(BaseEnvironment):
         )
         return new_states
 
+    @classmethod
+    def reverse_move(cls, action: int) -> int:
+        return action + 6 if action < 6 else action - 6
+
+    @classmethod
+    def reverse_moves(cls, actions: np.ndarray) -> np.ndarray:
+        pos_dir = actions >= 6
+        actions = actions + 6
+        actions[pos_dir] -= 12
+        return actions
+
+    @classmethod
+    def _as633(cls, state: np.ndarray) -> np.ndarray:
+
+        state633 = (np.ones((3, 3, 6)) * np.arange(6)).transpose(2, 1, 0).astype(int)
+        for i in range(8):
+            # Inserts values for corner i in position pos
+            pos = state[i] // 3
+            orientation = state[i] % 3
+            # For these corners, "right turn" order is 0 2 1 instead of 0 1 2, so orientation is messed up without this fix
+            if pos in [0, 2, 5, 7]:
+                orientation *= -1
+            values = np.roll([x[0] for x in cls.corner_633map[i]], orientation)
+            state633[cls.corner_633map[pos][0]] = values[0]
+            state633[cls.corner_633map[pos][1]] = values[1]
+            state633[cls.corner_633map[pos][2]] = values[2]
+
+        for i in range(12):
+            # Inserts values for side i in position pos
+            pos = state[i + 8] // 2
+            orientation = state[i + 8] % 2
+            values = np.roll([x[0] for x in cls.side_633map[i]], orientation)
+            state633[cls.side_633map[pos][0]] = values[0]
+            state633[cls.side_633map[pos][1]] = values[1]
+
+        return state633
+
+    @classmethod
+    def _stringify_cube(cls, state633: np.ndarray) -> str:
+        stringarr = np.empty((9, 12), dtype=str)
+        stringarr[...] = " "
+        simple = np.array([
+            [-1, cls.T, -1, -1],
+            [cls.L, cls.F, cls.R, cls.B],
+            [-1, cls.D, -1, -1],
+        ])
+        for i in range(6):
+            pos = tuple(int(x) for x in np.where(simple == i))
+            stringarr[pos[0] * 3: pos[0] * 3 + 3, pos[1] * 3: pos[1] * 3 + 3] = state633[i].astype(str)
+        string = "\n".join([" ".join(list(y)) for y in stringarr])
+        return string
+
+    @classmethod
+    def string(cls, state: np.ndarray) -> str:
+        return cls._stringify_cube(cls._as633(state))
+
 _ENVS = {
     "cube": _CubeEnvironment,
 }
 
-def get_env(env: str) -> BaseEnvironment:
-    return _ENVS[env]()
+def get_env(env: str) -> Type[BaseEnvironment]:
+    return _ENVS[env]
