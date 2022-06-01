@@ -10,3 +10,4 @@ ignore =
     E302  ; Two empty lines between classes and classes
     E305  ; Two empty lines between functions and classes
     N803  ; Allow variables to start with upper case
+    N806

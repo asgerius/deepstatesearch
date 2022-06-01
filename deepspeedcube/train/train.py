@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import numpy as np
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -29,7 +30,12 @@ class TrainConfig(DataStorage, json_name="train_config.json", indent=4):
 
 @dataclass
 class TrainResults(DataStorage, json_name="train_results.json", indent=4):
+    eval_idx: list[int]
+    # depth [ batch [ value ] ]
+    value_estimations: list[list[float]] = field(default_factory=list)
+
     lr: list[float] = field(default_factory=list)
+    # model [ batch [ loss ] ]
     losses: list[list[float]] = field(default_factory=list)
 
 def train(job: JobDescription):
@@ -50,6 +56,11 @@ def train(job: JobDescription):
 
     log("Setting up environment '%s'" % train_cfg.env)
     env = get_env(train_cfg.env)
+
+    eval_batches = np.arange(0, train_cfg.batches, 10, dtype=int).tolist()
+    if (last_batch_idx := train_cfg.batches - 1) != eval_batches[-1]:
+        eval_batches.append(last_batch_idx)
+    log("Evaluating at batches", eval_batches)
 
     log.section("Building models")
     model_cfg = ModelConfig(
@@ -86,10 +97,31 @@ def train(job: JobDescription):
     log(models[0], "Size in bytes: %s" % thousands_seperators(4*models[0].numel()))
 
     log.section("Starting training")
-    train_results = TrainResults()
+    train_results = TrainResults(eval_idx=eval_batches)
+    train_results.value_estimations.extend(list() for _ in range(train_cfg.scramble_depth))
     train_results.losses.extend(list() for _ in range(train_cfg.num_models))
 
     for i in range(train_cfg.batches):
+
+        if i in eval_batches:
+            TT.profile("Evaluate")
+            log("Evaluating models")
+
+            states, depths = gen_new_states(env, 10 ** 5, train_cfg.scramble_depth)
+            states_oh = env.multiple_oh(states)
+            with TT.profile("Value estimates"), torch.no_grad():
+                preds = torch.zeros(len(states))
+                for model in models:
+                    preds += model(states_oh).squeeze()
+                preds = train_cfg.j_norm * preds / len(models)
+
+                for i in range(train_cfg.scramble_depth):
+                    train_results.value_estimations[i].append(
+                        preds[depths == i + 1].mean().item()
+                    )
+
+            TT.end_profile()
+
         TT.profile("Batch")
         log("Batch %i / %i" % (i+1, train_cfg.batches))
 
@@ -174,6 +206,7 @@ def train(job: JobDescription):
                 update_generator_network(train_cfg.tau, gen_models[j], models[j])
 
         log("Mean loss: %.4f" % (sum(ls[-1] for ls in train_results.losses) / train_cfg.num_models))
+
         TT.end_profile()
 
     log.section("Saving")

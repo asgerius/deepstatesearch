@@ -16,7 +16,18 @@ def plot_loss(loc: str, cfg: TrainConfig, res: TrainResults):
         plt.plot(losses.T, alpha=0.5, c=plots.tab_colours[0])
         plt.grid()
         plt.xlabel("Batch")
-        plt.ylabel("MSE Loss")
+        plt.ylabel("MSE loss")
+
+def plot_value_estimates(loc: str, cfg: TrainConfig, res: TrainResults):
+    with plots.Figure(f"{loc}/plots-train/value-estimates.png"):
+        Ks = (1, 5, 7, 10, 13, 15, 17, 20, 30)
+        for K in Ks:
+            plt.plot(res.eval_idx, res.value_estimations[K-1], label="$K=%i$" % K)
+
+        plt.grid()
+        plt.xlabel("Batch")
+        plt.ylabel("Avg. value estimate")
+        plt.legend(loc="upper left")
 
 def plot_lr(loc: str, cfg: TrainConfig, res: TrainResults):
     with plots.Figure(f"{loc}/plots-train/lr.png"):
@@ -39,5 +50,7 @@ if __name__ == "__main__":
 
         log("Plotting loss")
         plot_loss(args.location, cfg, res)
+        log("Plotting value estimates")
+        plot_value_estimates(args.location, cfg, res)
         log("Plotting learning rate")
         plot_lr(args.location, cfg, res)
