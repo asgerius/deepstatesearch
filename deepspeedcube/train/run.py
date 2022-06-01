@@ -13,6 +13,7 @@ options = (
     Option("lr",                  default=1e-4),
     Option("num-models",          default=1),
     Option("tau",                 default=0.3, help="1 for no generator network and 0 for static generator network"),
+    Option("j-norm",              default=20, type=float),
     Option("hidden-layer-sizes",  default=[4096, 1024], type=int, nargs=0),
     Option("num-residual-blocks", default=4),
     Option("residual-size",       default=1024),

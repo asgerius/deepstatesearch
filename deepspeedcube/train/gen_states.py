@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from math import ceil
 
 import torch
@@ -7,7 +9,7 @@ from deepspeedcube import device
 from deepspeedcube.envs import BaseEnvironment
 
 
-def gen_new_states(env: BaseEnvironment, num_states: int, K: int) -> torch.Tensor:
+def gen_new_states(env: BaseEnvironment, num_states: int, K: int) -> tuple[torch.Tensor, torch.Tensor]:
     states_per_depth = ceil(num_states / K)
 
     with TT.profile("Generate states"):
@@ -21,7 +23,9 @@ def gen_new_states(env: BaseEnvironment, num_states: int, K: int) -> torch.Tenso
             env.multiple_moves(actions, states[start:], inplace=True)
 
     with TT.profile("Shuffle states"):
-        states = states[torch.randperm(len(states))][:num_states]
+        shuffle_index = torch.randperm(len(states))
+        inverse = torch.argsort(shuffle_index)
+        states = states[shuffle_index][:num_states]
 
-    return states
+    return states, inverse
 

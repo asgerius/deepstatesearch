@@ -25,6 +25,7 @@ class TrainConfig(DataStorage, json_name="train_config.json", indent=4):
     scramble_depth: int
     lr: float
     tau: float
+    j_norm: float
 
 @dataclass
 class TrainResults(DataStorage, json_name="train_results.json", indent=4):
@@ -43,6 +44,7 @@ def train(job: JobDescription):
         scramble_depth = job.scramble_depth,
         lr             = job.lr,
         tau            = job.tau,
+        j_norm         = job.j_norm,
     )
     log("Got training config", train_cfg)
 
@@ -81,7 +83,7 @@ def train(job: JobDescription):
         "Parameters per model: %s" % thousands_seperators(models[0].numel()),
         "Total parameters:     %s" % thousands_seperators(sum(m.numel() for m in models)),
     )
-    log(models[0])
+    log(models[0], "Size in bytes: %s" % thousands_seperators(4*models[0].numel()))
 
     log.section("Starting training")
     train_results = TrainResults()
@@ -93,7 +95,7 @@ def train(job: JobDescription):
 
         log.debug("Generating %i states" % (train_cfg.batch_size * train_cfg.num_models))
         with TT.profile("Generate scrambled states"):
-            all_states = gen_new_states(
+            all_states, _ = gen_new_states(
                 env,
                 train_cfg.batch_size * train_cfg.num_models,
                 train_cfg.scramble_depth,
@@ -104,6 +106,7 @@ def train(job: JobDescription):
             log.debug("Training model %i / %i" % (j+1, train_cfg.num_models))
 
             model = models[j]
+            gen_model = gen_models[j]
             optimizer = optimizers[j]
             scheduler = schedulers[j]
 
@@ -118,7 +121,7 @@ def train(job: JobDescription):
 
             with TT.profile("Value estimates"), torch.no_grad():
                 # TODO Forward pass only unique and non-solved states
-                value_estimates = model(neighbour_states_oh).squeeze()
+                value_estimates = gen_model(neighbour_states_oh).squeeze()
 
             with TT.profile("Set solved states to j = 0"):
                 solved_states = env.multiple_is_solved(neighbour_states)
@@ -126,7 +129,7 @@ def train(job: JobDescription):
             value_estimates = value_estimates.view(len(states), len(env.action_space))
 
             with TT.profile("Calculate targets"):
-                targets = torch.min(1+value_estimates, dim=1).values
+                targets = torch.min(1+value_estimates, dim=1).values / train_cfg.j_norm
 
             with TT.profile("OH states"):
                 states_oh = env.multiple_oh(states)
@@ -169,6 +172,8 @@ def train(job: JobDescription):
 
             with TT.profile("Update generator network"):
                 update_generator_network(train_cfg.tau, gen_models[j], models[j])
+
+        log("Mean loss: %.4f" % (sum(ls[-1] for ls in train_results.losses) / train_cfg.num_models))
         TT.end_profile()
 
     log.section("Saving")
