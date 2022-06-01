@@ -30,16 +30,20 @@ class _BaseModel(abc.ABC, nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         pass
 
-    def numel(self) -> int:
-        """ Number of model parameters. Further docs here: https://pokemondb.net/pokedex/numel """
-        return sum(p.numel() for p in self.parameters())
-
-    def activation_transform_layers(self, size: int) -> tuple[nn.Module]:
+    def activation_transform_layers(self, size: int) -> tuple[nn.Module, nn.Module, nn.Module]:
         return (
             nn.ReLU(),
             nn.BatchNorm1d(size),
             nn.Dropout(p=self.cfg.dropout),
         )
+
+    def numel(self) -> int:
+        """ Number of model parameters. Further docs here: https://pokemondb.net/pokedex/numel """
+        return sum(p.numel() for p in self.parameters())
+
+    def all_params(self) -> torch.Tensor:
+        """ Returns an array of all model parameters """
+        return torch.cat([x.detach().view(-1) for x in self.state_dict().values()])
 
 class Model(_BaseModel):
 

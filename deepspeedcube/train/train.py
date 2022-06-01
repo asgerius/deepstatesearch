@@ -76,7 +76,7 @@ def train(job: JobDescription):
     train_results = TrainResults()
     for i in range(train_cfg.batches):
         TT.profile("Batch")
-        log.debug("Batch %i / %i" % (i+1, train_cfg.batches))
+        log("Batch %i / %i" % (i+1, train_cfg.batches))
         for j in range(train_cfg.num_models):
             if j == 0:
                 train_results.lr.append(schedulers[j].get_last_lr()[0])
