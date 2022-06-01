@@ -51,7 +51,7 @@ class Model(_BaseModel):
 
         # Build initial fully connected layers
         fully_connected = list()
-        layer_sizes = [self.cfg.state_size] + self.cfg.hidden_layer_sizes
+        layer_sizes = [self.cfg.state_size] + self.cfg.hidden_layer_sizes + [self.cfg.residual_size]
         for in_size, out_size in zip(layer_sizes[:-1], layer_sizes[1:]):
             fully_connected.extend([
                 nn.Linear(in_size, out_size),
@@ -87,9 +87,9 @@ class _ResidualBlock(_BaseModel):
                 fully_connected.extend(
                     self.activation_transform_layers(self.cfg.residual_size)
                 )
-        self.fully_connected = nn.Sequential(*fully_connected)
 
-        self.output_transform = self.activation_transform_layers(self.cfg.residual_size)
+        self.fully_connected = nn.Sequential(*fully_connected)
+        self.output_transform = nn.Sequential(*self.activation_transform_layers(self.cfg.residual_size))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         fx = self.fully_connected(x)

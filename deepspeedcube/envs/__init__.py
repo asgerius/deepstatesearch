@@ -26,30 +26,45 @@ class BaseEnvironment(abc.ABC):
         return cls._solved_state.clone()
 
     @classmethod
+    def get_multiple_solved(cls, n: int) -> torch.Tensor:
+        return torch.vstack(n * [cls._solved_state])
+
+    @classmethod
     def is_solved(cls, state: torch.Tensor) -> bool:
         return torch.all(state == cls._solved_state)
+
+    @classmethod
+    def multiple_is_solved(cls, states: torch.Tensor) -> torch.BoolTensor:
+        return (states == cls._solved_state).all(dim=1)
 
     @abc.abstractclassmethod
     def move(cls, action: int, state: torch.Tensor) -> torch.Tensor:
         pass
 
     @abc.abstractclassmethod
-    def multiple_moves(cls, actions: torch.Tensor, states: torch.Tensor) -> torch.Tensor:
+    def multiple_moves(cls, actions: torch.Tensor, states: torch.Tensor, inplace=False) -> torch.Tensor:
         pass
+
+    @classmethod
+    def neighbours(cls, states: torch.Tensor) -> torch.Tensor:
+        neighbour_states = states.repeat_interleave(len(cls.action_space), dim=0)
+        actions = cls.action_space.repeat(len(states))
+        cls.multiple_moves(actions, neighbour_states, inplace=True)
+        return neighbour_states
 
     @classmethod
     def oh(cls, state: torch.Tensor) -> torch.Tensor:
         return F.one_hot(
-            state,
+            state.long(),
             num_classes=cls.state_oh_size // len(cls._solved_state),
-        ).reshape(1, -1)
+        ).astype(torch.float32).view(1, -1)
 
     @classmethod
     def multiple_oh(cls, states: torch.Tensor) -> torch.Tensor:
         return F.one_hot(
-            states,
+            states.long(),
             num_classes=cls.state_oh_size // len(cls._solved_state),
-        ).reshape(len(states), -1)
+        ).to(torch.float32).view(len(states), -1)
 
     @abc.abstractclassmethod
     def reverse_move(cls, action: int) -> int:
@@ -111,8 +126,8 @@ class _CubeEnvironment(BaseEnvironment):
         return new_state
 
     @classmethod
-    def multiple_moves(cls, actions: torch.Tensor, states: torch.Tensor) -> torch.Tensor:
-        new_states = states.clone()
+    def multiple_moves(cls, actions: torch.Tensor, states: torch.Tensor, inplace=False) -> torch.Tensor:
+        new_states = states if inplace else states.clone()
         _CUBELIB.multi_act(
             c_ptr(new_states),
             c_ptr(actions),

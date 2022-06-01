@@ -8,6 +8,8 @@ from deepspeedcube.train.train import train
 options = (
     Option("env",                 default="cube"),
     Option("batches",             default=100),
+    Option("batch-size",          default=1000),
+    Option("scramble_depth",      default=30),
     Option("lr",                  default=1e-4),
     Option("num-models",          default=1),
     Option("tau",                 default=0.3, help="1 for no generator network and 0 for static generator network"),

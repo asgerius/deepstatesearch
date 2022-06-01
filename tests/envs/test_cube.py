@@ -11,6 +11,14 @@ env = get_env("cube")
 is tested. Then, it is tested that env.multiple_moves
 always returns the same as env.move. """
 
+def test_get_multiple_solved():
+    for n in 1, 10, 100:
+        states = env.get_multiple_solved(n)
+        assert states.is_contiguous()
+        assert tuple(states.shape) == (n, len(env.get_solved()))
+        for state in states:
+            assert torch.all(state == env.get_solved())
+
 def test_reverse_move():
     # Test that applying moves and then reverse moves always
     # ends up in the original state
