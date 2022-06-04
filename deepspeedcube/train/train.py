@@ -57,7 +57,7 @@ def train(job: JobDescription):
     log("Setting up environment '%s'" % train_cfg.env)
     env = get_env(train_cfg.env)
 
-    eval_batches = np.arange(0, train_cfg.batches, 10, dtype=int).tolist()
+    eval_batches = np.arange(0, train_cfg.batches, 500, dtype=int).tolist()
     if (last_batch_idx := train_cfg.batches - 1) != eval_batches[-1]:
         eval_batches.append(last_batch_idx)
     log("Evaluating at batches", eval_batches)
@@ -83,7 +83,7 @@ def train(job: JobDescription):
         gen_model = Model(model_cfg)
         clone_model(model, gen_model)
         optimizer = optim.AdamW(model.parameters(), lr=train_cfg.lr)
-        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=100)
+        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=20000)
         models.append(model)
         gen_models.append(gen_model)
         optimizers.append(optimizer)
@@ -107,7 +107,7 @@ def train(job: JobDescription):
             TT.profile("Evaluate")
             log("Evaluating models")
 
-            states, depths = gen_new_states(env, 10 ** 5, train_cfg.scramble_depth)
+            states, depths = gen_new_states(env, 10 ** 4, train_cfg.scramble_depth)
             states_oh = env.multiple_oh(states)
             with TT.profile("Value estimates"), torch.no_grad():
                 preds = torch.zeros(len(states))
@@ -115,9 +115,9 @@ def train(job: JobDescription):
                     preds += model(states_oh).squeeze()
                 preds = train_cfg.j_norm * preds / len(models)
 
-                for i in range(train_cfg.scramble_depth):
-                    train_results.value_estimations[i].append(
-                        preds[depths == i + 1].mean().item()
+                for j in range(train_cfg.scramble_depth):
+                    train_results.value_estimations[j].append(
+                        preds[depths == j + 1].mean().item()
                     )
 
             TT.end_profile()
@@ -153,15 +153,16 @@ def train(job: JobDescription):
 
             with TT.profile("Value estimates"), torch.no_grad():
                 # TODO Forward pass only unique and non-solved states
-                value_estimates = gen_model(neighbour_states_oh).squeeze()
+                J = gen_model(neighbour_states_oh).squeeze()
 
             with TT.profile("Set solved states to j = 0"):
                 solved_states = env.multiple_is_solved(neighbour_states)
-                value_estimates[solved_states] = 0
-            value_estimates = value_estimates.view(len(states), len(env.action_space))
+                J[solved_states] = 0
+            J = J.view(len(states), len(env.action_space))
 
             with TT.profile("Calculate targets"):
-                targets = torch.min(1+value_estimates, dim=1).values / train_cfg.j_norm
+                g = 1
+                targets = torch.min(g + J, dim=1).values
 
             with TT.profile("OH states"):
                 states_oh = env.multiple_oh(states)
@@ -174,6 +175,7 @@ def train(job: JobDescription):
                 log.debug("Loss: %.4f" % loss.item())
                 train_results.losses[j].append(loss.item())
                 optimizer.step()
+                optimizer.zero_grad()
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
 
@@ -185,7 +187,7 @@ def train(job: JobDescription):
                     "states_oh:           %s" % list(states_oh.shape),
                     "neighbour_states:    %s" % list(neighbour_states.shape),
                     "neighbour_states_oh: %s" % list(neighbour_states_oh.shape),
-                    "value_estimates:     %s" % list(value_estimates.shape),
+                    "value_estimates:     %s" % list(J.shape),
                     "targets:             %s" % list(targets.shape),
                     sep="\n    ",
                 )
@@ -195,7 +197,7 @@ def train(job: JobDescription):
                     "states_oh:           %s" % thousands_seperators(tensor_size(states_oh)),
                     "neighbour_states:    %s" % thousands_seperators(tensor_size(neighbour_states)),
                     "neighbour_states_oh: %s" % thousands_seperators(tensor_size(neighbour_states_oh)),
-                    "value_estimates:     %s" % thousands_seperators(tensor_size(value_estimates)),
+                    "value_estimates:     %s" % thousands_seperators(tensor_size(J)),
                     "targets:             %s" % thousands_seperators(tensor_size(targets)),
                     sep="\n    ",
                 )

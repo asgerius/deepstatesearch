@@ -14,7 +14,7 @@ def gen_new_states(env: BaseEnvironment, num_states: int, K: int) -> tuple[torch
 
     with TT.profile("Generate states"):
         states = env.get_multiple_solved(states_per_depth*K).to(device)
-        scramble_depths = torch.ones(len(states), dtype=int)
+        scramble_depths = torch.zeros(len(states), dtype=int)
 
     with TT.profile("Scramble states"):
         for i in range(K):
