@@ -1,7 +1,7 @@
 import torch
 
 from deepspeedcube.model import ModelConfig, Model
-from deepspeedcube.train.generator_network import update_generator_network, clone_model
+from deepspeedcube.model.generator_network import update_generator_network, clone_model
 
 
 def test_update_generator():

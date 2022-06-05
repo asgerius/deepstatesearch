@@ -20,7 +20,11 @@ def gen_new_states(env: BaseEnvironment, num_states: int, K: int) -> tuple[torch
         for i in range(K):
             start = i * states_per_depth
             n = len(states) - start
-            actions = torch.randint(0, len(env.action_space), (n,), dtype=torch.uint8)
+            actions = torch.randint(
+                0, len(env.action_space), (n,),
+                dtype=torch.uint8,
+                device=device,
+            )
             env.multiple_moves(actions, states[start:], inplace=True)
             scramble_depths[start:] += 1
 

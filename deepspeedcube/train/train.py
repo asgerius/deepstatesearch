@@ -13,8 +13,8 @@ from deepspeedcube import tensor_size
 
 from deepspeedcube.model import Model, ModelConfig
 from deepspeedcube.envs import get_env
-from deepspeedcube.train.gen_states import gen_new_states
-from deepspeedcube.train.generator_network import clone_model, update_generator_network
+from deepspeedcube.envs.gen_states import gen_new_states
+from deepspeedcube.model.generator_network import clone_model, update_generator_network
 
 
 @dataclass
