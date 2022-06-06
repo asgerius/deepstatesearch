@@ -3,3 +3,4 @@ numpy>=1.21
 torch>=1.10
 
 pelutils>=1.1
+py-cpuinfo>=8

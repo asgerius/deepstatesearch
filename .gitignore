@@ -9,6 +9,7 @@ out/
 configs/
 benchmark-results/
 job.sh
+jobs/
 
 # Latex
 *.aux
