@@ -14,7 +14,7 @@ from deepspeedcube import tensor_size
 from deepspeedcube import device
 from deepspeedcube.model import Model, ModelConfig
 from deepspeedcube.envs import get_env
-from deepspeedcube.envs.gen_states import gen_new_states
+from deepspeedcube.envs.gen_states import gen_new_states, get_batches_per_gen
 from deepspeedcube.model.generator_network import clone_model, update_generator_network
 
 
@@ -83,7 +83,7 @@ def train(job: JobDescription):
         model = Model(model_cfg).to(device)
         gen_model = Model(model_cfg).to(device)
         clone_model(model, gen_model)
-        optimizer = optim.AdamW(model.parameters(), lr=train_cfg.lr)
+        optimizer = optim.AdamW(model.parameters(), lr=train_cfg.lr, weight_decay=0)
         scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=20000)
         models.append(model)
         gen_models.append(gen_model)
@@ -102,11 +102,16 @@ def train(job: JobDescription):
     train_results.value_estimations.extend(list() for _ in range(train_cfg.scramble_depth))
     train_results.losses.extend(list() for _ in range(train_cfg.num_models))
 
+    batches_per_gen = get_batches_per_gen(env, train_cfg.num_models * train_cfg.batch_size)
+    log("Generating states every %i batches" % batches_per_gen)
+
     for i in range(train_cfg.batches):
 
         if i in eval_batches:
             TT.profile("Evaluate")
             log("Evaluating models")
+            for model in models:
+                model.eval()
 
             states, depths = gen_new_states(env, 10 ** 4, train_cfg.scramble_depth)
             states_oh = env.multiple_oh(states)
@@ -121,19 +126,49 @@ def train(job: JobDescription):
                         preds[depths == j + 1].mean().item()
                     )
 
+            for model in models:
+                model.train()
+
             TT.end_profile()
 
         TT.profile("Batch")
         log("Batch %i / %i" % (i+1, train_cfg.batches))
 
-        log.debug("Generating %i states" % (train_cfg.batch_size * train_cfg.num_models))
-        with TT.profile("Generate scrambled states"):
-            all_states, _ = gen_new_states(
-                env,
-                train_cfg.batch_size * train_cfg.num_models,
-                train_cfg.scramble_depth,
+        if i % batches_per_gen == 0:
+            num_states = batches_per_gen * train_cfg.batch_size * train_cfg.num_models
+            for model in models:
+                model = model.cpu()
+            log(
+                "Generating states:",
+                "States:     %s" % thousands_seperators(num_states),
+                "Neighbours: %s" % thousands_seperators(num_states * len(env.action_space)),
+                "Total:      %s" % thousands_seperators(num_states * (1 + len(env.action_space))),
             )
-        log.debug("Size of all states in bytes: %s" % thousands_seperators(tensor_size(all_states)))
+            with TT.profile("Generate scrambled states"):
+                all_states, _ = gen_new_states(
+                    env,
+                    num_states,
+                    train_cfg.scramble_depth,
+                )
+            with TT.profile("Generate neighbour states"):
+                all_neighbour_states = env.neighbours(all_states)
+            with TT.profile("Send states to CPU"):
+                all_states = all_states.cpu().view(
+                    batches_per_gen,
+                    train_cfg.num_models,
+                    train_cfg.batch_size,
+                    *env.get_solved().shape,
+                )
+                all_neighbour_states = all_neighbour_states.cpu().view(
+                    batches_per_gen,
+                    train_cfg.num_models,
+                    train_cfg.batch_size * len(env.action_space),
+                    *env.get_solved().shape,
+                )
+            log.debug("Size of states in bytes: %s" % thousands_seperators(tensor_size(all_states)))
+
+            for model in models:
+                model = model.to(device)
 
         for j in range(train_cfg.num_models):
             log.debug("Training model %i / %i" % (j+1, train_cfg.num_models))
@@ -143,9 +178,9 @@ def train(job: JobDescription):
             optimizer = optimizers[j]
             scheduler = schedulers[j]
 
-            log.debug("Generating neighbour states")
-            states = all_states[j*train_cfg.batch_size:(j+1)*train_cfg.batch_size]
-            neighbour_states = env.neighbours(states)
+            with TT.profile("Transfer states to device"):
+                states = all_states[i % batches_per_gen, j].to(device)
+                neighbour_states = all_neighbour_states[i % batches_per_gen, j].to(device)
 
             log.debug("Forward passing states")
             with TT.profile("OH neighbour states"):
@@ -184,26 +219,27 @@ def train(job: JobDescription):
 
             if j == 0:
                 train_results.lr.append(schedulers[j].get_last_lr()[0])
-                log.debug(
-                    "Shapes",
-                    "states:              %s" % list(states.shape),
-                    "states_oh:           %s" % list(states_oh.shape),
-                    "neighbour_states:    %s" % list(neighbour_states.shape),
-                    "neighbour_states_oh: %s" % list(neighbour_states_oh.shape),
-                    "value_estimates:     %s" % list(J.shape),
-                    "targets:             %s" % list(targets.shape),
-                    sep="\n    ",
-                )
-                log.debug(
-                    "Sizes in bytes",
-                    "states:              %s" % thousands_seperators(tensor_size(states)),
-                    "states_oh:           %s" % thousands_seperators(tensor_size(states_oh)),
-                    "neighbour_states:    %s" % thousands_seperators(tensor_size(neighbour_states)),
-                    "neighbour_states_oh: %s" % thousands_seperators(tensor_size(neighbour_states_oh)),
-                    "value_estimates:     %s" % thousands_seperators(tensor_size(J)),
-                    "targets:             %s" % thousands_seperators(tensor_size(targets)),
-                    sep="\n    ",
-                )
+                if i == 0:
+                    log.debug(
+                        "Shapes",
+                        "states:              %s" % list(states.shape),
+                        "states_oh:           %s" % list(states_oh.shape),
+                        "neighbour_states:    %s" % list(neighbour_states.shape),
+                        "neighbour_states_oh: %s" % list(neighbour_states_oh.shape),
+                        "value_estimates:     %s" % list(J.shape),
+                        "targets:             %s" % list(targets.shape),
+                        sep="\n    ",
+                    )
+                    log.debug(
+                        "Sizes in bytes",
+                        "states:              %s" % thousands_seperators(tensor_size(states)),
+                        "states_oh:           %s" % thousands_seperators(tensor_size(states_oh)),
+                        "neighbour_states:    %s" % thousands_seperators(tensor_size(neighbour_states)),
+                        "neighbour_states_oh: %s" % thousands_seperators(tensor_size(neighbour_states_oh)),
+                        "value_estimates:     %s" % thousands_seperators(tensor_size(J)),
+                        "targets:             %s" % thousands_seperators(tensor_size(targets)),
+                        sep="\n    ",
+                    )
 
             scheduler.step()
 

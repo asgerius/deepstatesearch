@@ -18,12 +18,12 @@ options = (
     Option("hidden-layer-sizes",  default=[4096, 1024], type=int, nargs=0),
     Option("num-residual-blocks", default=4),
     Option("residual-size",       default=1024),
-    Option("dropout",             default=0),
+    Option("dropout",             default=0, type=float),
 )
 
 if __name__ == "__main__":
     parser = Parser(*options, multiple_jobs=True)
-    job_descriptions = parser.parse_args()
+    job_descriptions = parser.parse_args(clear_folders=True)
     for i, job in enumerate(job_descriptions):
         TT.reset()
         log.configure(f"{job.location}/train.log")
