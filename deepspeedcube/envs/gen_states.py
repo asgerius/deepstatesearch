@@ -13,8 +13,8 @@ def gen_new_states(env: BaseEnvironment, num_states: int, K: int) -> tuple[torch
     states_per_depth = ceil(num_states / K)
 
     with TT.profile("Generate states"):
-        states = env.get_multiple_solved(states_per_depth*K).to(device)
-        scramble_depths = torch.zeros(len(states), dtype=int)
+        states = env.get_multiple_solved(states_per_depth*K)
+        scramble_depths = torch.zeros(len(states), dtype=torch.int16, device=device)
 
     with TT.profile("Scramble states"):
         for i in range(K):
@@ -29,9 +29,9 @@ def gen_new_states(env: BaseEnvironment, num_states: int, K: int) -> tuple[torch
             scramble_depths[start:] += 1
 
     with TT.profile("Shuffle states"):
-        shuffle_index = torch.randperm(len(states))
-        states = states[shuffle_index][:num_states]
-        scramble_depths = scramble_depths[shuffle_index][:num_states]
+        shuffle_index = torch.randperm(len(states), device=device)
+        states[:] = states[shuffle_index]
+        scramble_depths[:] = scramble_depths[shuffle_index]
 
     return states, scramble_depths
 

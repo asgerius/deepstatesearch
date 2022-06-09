@@ -28,7 +28,7 @@ class BaseEnvironment(abc.ABC):
 
     @classmethod
     def get_multiple_solved(cls, n: int) -> torch.Tensor:
-        return torch.vstack(n * [cls._solved_state])
+        return cls._solved_state.repeat((n, *[1]*len(cls._solved_state.shape)))
 
     @classmethod
     def is_solved(cls, state: torch.Tensor) -> bool:
@@ -49,7 +49,7 @@ class BaseEnvironment(abc.ABC):
     @classmethod
     def neighbours(cls, states: torch.Tensor) -> torch.Tensor:
         neighbour_states = states.repeat_interleave(len(cls.action_space), dim=0)
-        actions = cls.action_space.repeat(len(states))
+        actions = cls.action_space.repeat(len(states)).to(states.device)
         cls.multiple_moves(actions, neighbour_states, inplace=True)
         return neighbour_states
 
@@ -155,8 +155,8 @@ class _CubeEnvironment(BaseEnvironment):
         action = torch.Tensor([action]).to(cls.dtype)
         if state.is_cuda:
             _CUBELIB_CUDA.multi_act(
-                ptr(cls.full_action_maps[0]),
-                ptr(cls.full_action_maps[1]),
+                ptr(cls.full_action_maps),
+                # ptr(cls.full_action_maps[1]),
                 ptr(new_state),
                 ptr(action.cuda()),
                 1,
@@ -176,8 +176,8 @@ class _CubeEnvironment(BaseEnvironment):
         new_states = states if inplace else states.clone()
         if new_states.is_cuda:
             _CUBELIB_CUDA.multi_act(
-                ptr(cls.full_action_maps[0]),
-                ptr(cls.full_action_maps[1]),
+                ptr(cls.full_action_maps),
+                # ptr(cls.full_action_maps[1]),
                 ptr(new_states),
                 ptr(actions),
                 len(actions),

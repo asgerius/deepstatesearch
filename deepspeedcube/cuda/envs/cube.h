@@ -8,8 +8,8 @@ typedef char face;
 typedef char action;
 
 extern "C" void multi_act(
-    char *c_maps_d,
-    char *s_maps_d,
+    char *maps_d,
+    // char *s_maps_d,
     face *states_d,
     action *actions_d,
     size_t n

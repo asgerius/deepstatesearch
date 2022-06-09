@@ -5,14 +5,11 @@ from argparse import ArgumentParser
 from dataclasses import dataclass
 from math import ceil
 
-if "NO_CUDA" in os.environ:
-    os.environ["CUDA_VISIBLE_DEVICES"] = ""
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pelutils.ds.plots as plots
 import torch
-from pelutils import log, DataStorage, TT, thousands_seperators, EnvVars
+from pelutils import log, DataStorage, TT, thousands_seperators
 
 from deepspeedcube import device, HardwareInfo
 from deepspeedcube.benchmarks import savedir
@@ -20,20 +17,20 @@ from deepspeedcube.envs import get_env
 from deepspeedcube.envs.gen_states import gen_new_states
 
 
-env = get_env("cube")
 cuda = torch.cuda.is_available()
 device_name = HardwareInfo.gpu or HardwareInfo.cpu
 
 @dataclass
 class CubeResults(DataStorage, json_name="cube_results.json", indent=4):
     n: list[int]
-    move_time: list[list[float]]
+    scramble_time:     list[list[float]]
+    move_time:         list[list[float]]
     move_time_inplace: list[list[float]]
 
-    cpu     = HardwareInfo.cpu
-    sockets = HardwareInfo.sockets
-    cores   = HardwareInfo.cores
-    gpu     = HardwareInfo.gpu
+    cpu:     str = HardwareInfo.cpu
+    sockets: int = HardwareInfo.sockets
+    cores:   int = HardwareInfo.cores
+    gpu:     str = HardwareInfo.gpu
 
 def benchmark():
     log.configure(f"{savedir}/cube_{device_name}.log")
@@ -49,10 +46,11 @@ def benchmark():
         sep="\n    ",
     )
 
-    reps = 5
+    reps = 20
     res = CubeResults(
-        n = np.logspace(0, 9 if cuda else 8, 20, dtype=int).tolist(),
-        move_time = [list() for _ in range(reps)],
+        n = np.logspace(0, 8.5, 20, dtype=int).tolist(),
+        scramble_time     = [list() for _ in range(reps)],
+        move_time         = [list() for _ in range(reps)],
         move_time_inplace = [list() for _ in range(reps)],
     )
 
@@ -60,22 +58,25 @@ def benchmark():
         log.section("Repetition %i / %i" % (i+1, reps))
         for n in res.n:
             log(f"Running for n = {thousands_seperators(n)}")
-            log.debug("Generating random states and actions")
+            TT.tick()
             states, _ = gen_new_states(env, n, 30)
+            t = TT.tock()
+            res.scramble_time[i].append(t/n)
+
+            log.debug("Scramble: %.6f ms" % (1e3*t))
+
             actions = env.action_space.repeat(ceil(n / len(env.action_space)))[:n].to(device)
 
-            log.debug("Performing actions")
             TT.tick()
             states = env.multiple_moves(actions, states)
             t = TT.tock()
-            log.debug("Used %.6f ms" % (1e3*t))
+            log.debug("OOP:      %.6f ms" % (1e3*t))
             res.move_time[i].append(t/n)
 
-            log.debug("Performing actions inplace")
             TT.tick()
             states = env.multiple_moves(actions, states, inplace=True)
             t = TT.tock()
-            log.debug("Used %.6f ms" % (1e3*t))
+            log.debug("Inplace:  %.6f ms" % (1e3*t))
             res.move_time_inplace[i].append(t/n)
 
     log("Saving results")
@@ -88,13 +89,13 @@ def plot():
     times = [1e9 * np.array(r.move_time) for r in res]
     times_inplace = [1e9 * np.array(r.move_time_inplace) for r in res]
 
-    with plots.Figure(f"{savedir}/cube.png", legend_fontsize=0.75):
+    with plots.Figure(f"{savedir}/cube-move.png", legend_fontsize=0.75):
         for i, r in enumerate(res):
             times = 1e9 * np.array(r.move_time).mean(axis=0)
             times_inplace = 1e9 * np.array(r.move_time_inplace).mean(axis=0)
 
             if r.gpu is None:
-                name = f"{r.sockets} x {r.cores//r.sockets} C " + names[i]
+                name = f"{r.cores//r.sockets} C " + names[i]
             else:
                 name = names[i]
             plt.plot(r.n, times,         "-o",  c=plots.tab_colours[i], label=name)
@@ -108,11 +109,31 @@ def plot():
         plt.ylabel("Avg. move time [ns]")
         plt.legend(loc=1)
 
+    with plots.Figure(f"{savedir}/cube-gen.png", legend_fontsize=0.75):
+        for i, r in enumerate(res):
+            times = 1e9 * np.array(r.scramble_time).mean(axis=0)
+
+            if r.gpu is None:
+                name = f"{r.cores//r.sockets} C " + names[i]
+            else:
+                name = names[i]
+            plt.plot(r.n, times,         "-o",  c=plots.tab_colours[i], label=name)
+
+        plt.xscale("log")
+        plt.yscale("log")
+
+        plt.grid()
+        plt.xlabel("Number of states")
+        plt.ylabel("Avg. gen. time [ns]")
+        plt.legend(loc=1)
+
 if __name__ == "__main__":
     with log.log_errors:
         parser = ArgumentParser()
         parser.add_argument("--plot", action="store_true")
+        parser.add_argument("--env", default="cube")
         args = parser.parse_args()
+        env = get_env(args.env)
         if args.plot:
             plot()
         else:

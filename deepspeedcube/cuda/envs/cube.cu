@@ -7,48 +7,38 @@
 
 
 __global__ void _multi_act(
-    char *c_maps_d,
-    char *s_maps_d,
+    char *maps_d,
+    // char *s_maps_d,
     face *states_d,
     action *actions_d,
     size_t n
 ) {
     int tidy = threadIdx.x + blockIdx.x * blockDim.x;
-    int tidx = threadIdx.y + blockIdx.y * blockDim.y;
 
     if (tidy < n) {
         // Performs n actions_d on n states in-place
-        // Row pointer for easy indexing
-        face *p_state = states_d + 20 * tidy;
-        // Slightly faster by only looking up maps once
-        const action action = actions_d[tidy];
-        // Map corners
+        int tidx = threadIdx.y + blockIdx.y * blockDim.y;
+        int idx = FACES_PER_THREAD * tidx;
+        char *ptr = (
+            maps_d + 12 * 24 * (idx >= 8)
+        ) + 24 * actions_d[tidy];
+        face *face_ptr = states_d + 20 * tidy + idx;
         int i;
-        if (FACES_PER_THREAD * tidx < 8) {
-            #pragma unroll
-            for (i = 0; i < FACES_PER_THREAD; i ++) {
-                face *face_ptr = p_state + FACES_PER_THREAD * tidx + i;
-                *face_ptr = (c_maps_d+24*action)[*face_ptr];
-            }
-        } else {
-            #pragma unroll
-            for (i = 0; i < FACES_PER_THREAD; i ++) {
-                face *face_ptr = p_state + FACES_PER_THREAD * tidx + i;
-                *face_ptr = (s_maps_d+24*action)[*face_ptr];
-            }
+        #pragma unroll
+        for (i = 0; i < FACES_PER_THREAD; ++ i) {
+            face_ptr[i] = ptr[face_ptr[i]];
         }
     }
 }
 
 extern "C" void multi_act(
-    char *c_maps_d,
-    char *s_maps_d,
+    char *maps_d,
     face *states_d,
     action *actions_d,
     size_t n
 ) {
-    _multi_act<<<dim3((n-1)/(20*K)+1, 1), dim3(K, 20/FACES_PER_THREAD)>>>(
-        c_maps_d, s_maps_d, states_d, actions_d, n
+    _multi_act<<<(n-1) / (20*K) + 1, dim3(K, 20/FACES_PER_THREAD)>>>(
+        maps_d, states_d, actions_d, n
     );
     cudaDeviceSynchronize();
 }

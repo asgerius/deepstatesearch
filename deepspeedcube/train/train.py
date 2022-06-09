@@ -11,6 +11,7 @@ from pelutils.datastorage import DataStorage
 from pelutils.parser import JobDescription
 from deepspeedcube import tensor_size
 
+from deepspeedcube import device
 from deepspeedcube.model import Model, ModelConfig
 from deepspeedcube.envs import get_env
 from deepspeedcube.envs.gen_states import gen_new_states
@@ -79,8 +80,8 @@ def train(job: JobDescription):
     schedulers = list()
     for _ in range(train_cfg.num_models):
         TT.profile("Build model")
-        model = Model(model_cfg)
-        gen_model = Model(model_cfg)
+        model = Model(model_cfg).to(device)
+        gen_model = Model(model_cfg).to(device)
         clone_model(model, gen_model)
         optimizer = optim.AdamW(model.parameters(), lr=train_cfg.lr)
         scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=20000)
@@ -110,7 +111,7 @@ def train(job: JobDescription):
             states, depths = gen_new_states(env, 10 ** 4, train_cfg.scramble_depth)
             states_oh = env.multiple_oh(states)
             with TT.profile("Value estimates"), torch.no_grad():
-                preds = torch.zeros(len(states))
+                preds = torch.zeros(len(states), device=device)
                 for model in models:
                     preds += model(states_oh).squeeze()
                 preds = train_cfg.j_norm * preds / len(models)
@@ -154,6 +155,8 @@ def train(job: JobDescription):
             with TT.profile("Value estimates"), torch.no_grad():
                 # TODO Forward pass only unique and non-solved states
                 J = gen_model(neighbour_states_oh).squeeze()
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
 
             with TT.profile("Set solved states to j = 0"):
                 solved_states = env.multiple_is_solved(neighbour_states)
@@ -216,3 +219,6 @@ def train(job: JobDescription):
         train_cfg.save(job.location)
         model_cfg.save(job.location)
         train_results.save(job.location)
+
+        for i, model in enumerate(models):
+            torch.save(model.state_dict(), f"{job.location}/model-{i}.pt")
