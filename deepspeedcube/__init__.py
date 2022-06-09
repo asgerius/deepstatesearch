@@ -12,6 +12,8 @@ import torch
 cpu = torch.device("cpu")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+LIBDSC = ctypes.cdll.LoadLibrary("lib/libdsc.so")
+
 def ptr(arr: torch.Tensor) -> ctypes:
     return ctypes.c_void_p(arr.data_ptr())
 
@@ -19,6 +21,26 @@ def tensor_size(x: np.ndarray | torch.Tensor) -> int:
     if isinstance(x, np.ndarray):
         x = x.numpy()
     return x.element_size() * x.numel()
+
+def unique(x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """ Returns a tensor with the indices of unique elements in x
+    as well as a tensor of inverse indices. """
+    index = torch.empty(len(x), dtype=torch.long)
+    inverse = torch.empty(len(x), dtype=torch.long)
+
+    numel_per_element = np.cumprod((*x.shape[1:], 1))[-1]
+
+    num_unique = LIBDSC.unique(
+        ptr(x),
+        ctypes.c_size_t(len(x)),
+        ctypes.c_size_t(x.element_size() * numel_per_element),
+        ptr(index),
+        ptr(inverse),
+    )
+
+    index = index[:num_unique]
+
+    return index, inverse
 
 class HardwareInfo:
 
