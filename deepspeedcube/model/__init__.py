@@ -32,9 +32,9 @@ class _BaseModel(abc.ABC, nn.Module):
 
     def activation_transform_layers(self, size: int) -> tuple[nn.Module, nn.Module, nn.Module]:
         return (
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
             nn.BatchNorm1d(size),
-            nn.Dropout(p=self.cfg.dropout),
+            nn.Dropout(p=self.cfg.dropout, inplace=True),
         )
 
     def numel(self) -> int:

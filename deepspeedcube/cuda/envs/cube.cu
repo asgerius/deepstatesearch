@@ -8,20 +8,17 @@
 
 __global__ void _multi_act(
     char *maps_d,
-    // char *s_maps_d,
     face *states_d,
     action *actions_d,
     size_t n
 ) {
-    int tidy = threadIdx.x + blockIdx.x * blockDim.x;
+    size_t tidy = threadIdx.x + blockIdx.x * blockDim.x;
 
     if (tidy < n) {
         // Performs n actions_d on n states in-place
         int tidx = threadIdx.y + blockIdx.y * blockDim.y;
         int idx = FACES_PER_THREAD * tidx;
-        char *ptr = (
-            maps_d + 12 * 24 * (idx >= 8)
-        ) + 24 * actions_d[tidy];
+        char *ptr = maps_d + 12 * 24 * (idx >= 8) + 24 * actions_d[tidy];
         face *face_ptr = states_d + 20 * tidy + idx;
         int i;
         #pragma unroll
@@ -37,7 +34,7 @@ extern "C" void multi_act(
     action *actions_d,
     size_t n
 ) {
-    _multi_act<<<(n-1) / (20*K) + 1, dim3(K, 20/FACES_PER_THREAD)>>>(
+    _multi_act<<<(n-1) / K + 1, dim3(K, 20/FACES_PER_THREAD)>>>(
         maps_d, states_d, actions_d, n
     );
     cudaDeviceSynchronize();

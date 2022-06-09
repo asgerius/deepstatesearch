@@ -7,7 +7,6 @@ import subprocess
 import cpuinfo
 import numpy as np
 import torch
-from pelutils import c_ptr
 
 
 cpu = torch.device("cpu")
@@ -18,7 +17,7 @@ def ptr(arr: torch.Tensor) -> ctypes:
 
 def tensor_size(x: np.ndarray | torch.Tensor) -> int:
     if isinstance(x, np.ndarray):
-        return c_ptr(x)
+        x = x.numpy()
     return x.element_size() * x.numel()
 
 class HardwareInfo:
