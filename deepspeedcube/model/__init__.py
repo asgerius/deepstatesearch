@@ -10,11 +10,11 @@ from pelutils.datastorage import DataStorage
 
 @dataclass
 class ModelConfig(DataStorage, json_name="model_config.json", indent=4):
-    state_size: int
-    hidden_layer_sizes: list[int]
+    state_size:          int
+    hidden_layer_sizes:  list[int]
     num_residual_blocks: int
-    residual_size: int
-    dropout: float
+    residual_size:       int
+    dropout:             float
 
 class _BaseModel(abc.ABC, nn.Module):
     def __init__(self, cfg: ModelConfig):

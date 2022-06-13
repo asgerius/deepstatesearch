@@ -36,6 +36,27 @@ def gen_new_states(env: Environment, num_states: int, K: int) -> tuple[torch.Ten
 
     return states[:num_states], scramble_depths[:num_states]
 
+def gen_eval_states(env: Environment, states_per_depth: int, depths: list[int]) -> torch.Tensor:
+    total_states = states_per_depth * len(depths)
+
+    with TT.profile("Create states"):
+        states = env.get_multiple_solved(total_states)
+
+    with TT.profile("Scramble states"):
+        for i, (prev_depth, depth) in enumerate(zip([0, *depths[:-1]], depths)):
+            start = i * states_per_depth
+            n_states = total_states - start
+            scrambles = depth - prev_depth
+            for _ in range(scrambles):
+                actions = torch.randint(
+                    0, len(env.action_space), (n_states,),
+                    dtype=torch.uint8,
+                    device=device,
+                )
+                env.multiple_moves(actions, states[start:], inplace=True)
+
+    return states.view(len(depths), states_per_depth, *env.get_solved().shape)
+
 def get_batches_per_gen(env: Environment, batch_size: int) -> int:
     max_gen_states = 250 * 10 ** 6
 

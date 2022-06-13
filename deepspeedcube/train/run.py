@@ -6,6 +6,7 @@ from pelutils.parser import Option, Parser
 from deepspeedcube import HardwareInfo
 from deepspeedcube.train.train import train
 
+
 options = (
     Option("env",                 default="cube"),
     Option("batches",             default=10000),
@@ -31,7 +32,7 @@ if __name__ == "__main__":
         TT.reset()
         log.configure(f"{job.location}/train.log")
         with log.log_errors:
-            log.section(f"Training {i+1} / {len(job_descriptions)}")
+            log.section(f"Training {i+1} / {len(job_descriptions)}: {job.name}")
             log.log_repo()
             log(
                 "Hardware info:",
