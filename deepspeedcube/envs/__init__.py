@@ -15,7 +15,7 @@ _CUBELIB = ctypes.cdll.LoadLibrary("lib/cube.so")
 if torch.cuda.is_available():
     _CUBELIB_CUDA = ctypes.cdll.LoadLibrary("lib/cube_cuda.so")
 
-class BaseEnvironment(abc.ABC):
+class Environment(abc.ABC):
 
     dtype: type
     action_space: torch.Tensor
@@ -79,7 +79,7 @@ class BaseEnvironment(abc.ABC):
     def string(cls, state: torch.Tensor) -> str:
         pass
 
-class _CubeEnvironment(BaseEnvironment):
+class _CubeEnvironment(Environment):
 
     dtype = torch.uint8
     action_space = torch.arange(12, dtype=torch.uint8)
@@ -253,5 +253,5 @@ _ENVS = {
     "cube": _CubeEnvironment,
 }
 
-def get_env(env: str) -> Type[BaseEnvironment]:
+def get_env(env: str) -> Type[Environment]:
     return _ENVS[env]

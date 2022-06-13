@@ -14,11 +14,14 @@ options = (
     Option("lr",                  default=1e-5),
     Option("num-models",          default=1),
     Option("tau",                 default=0.1, help="1 for no generator network and 0 for static generator network"),
+    Option("tau-every",           default=500),
     Option("j-norm",              default=1, type=float),
     Option("hidden-layer-sizes",  default=[4096, 1024], type=int, nargs=0),
     Option("num-residual-blocks", default=4),
     Option("residual-size",       default=1024),
     Option("dropout",             default=0, type=float),
+    Option("weight-decay",        default=0, type=float),
+    Option("max-update-loss",     default=1e6, type=float),
 )
 
 if __name__ == "__main__":

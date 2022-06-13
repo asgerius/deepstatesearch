@@ -7,10 +7,10 @@ import torch
 from pelutils import TT, log, thousands_seperators
 
 from deepspeedcube import device, tensor_size
-from deepspeedcube.envs import BaseEnvironment
+from deepspeedcube.envs import Environment
 
 
-def gen_new_states(env: BaseEnvironment, num_states: int, K: int) -> tuple[torch.Tensor, torch.Tensor]:
+def gen_new_states(env: Environment, num_states: int, K: int) -> tuple[torch.Tensor, torch.Tensor]:
     states_per_depth = ceil(num_states / K)
 
     with TT.profile("Create states"):
@@ -34,11 +34,10 @@ def gen_new_states(env: BaseEnvironment, num_states: int, K: int) -> tuple[torch
         states[:] = states[shuffle_index]
         scramble_depths[:] = scramble_depths[shuffle_index]
 
-    return states, scramble_depths
+    return states[:num_states], scramble_depths[:num_states]
 
-def get_batches_per_gen(env: BaseEnvironment, batch_size: int) -> int:
+def get_batches_per_gen(env: Environment, batch_size: int) -> int:
     max_gen_states = 250 * 10 ** 6
-    max_memory_frac = 0.8
 
     # Calculate memory requirements for scrambling
     state_memory           = tensor_size(env.get_solved())
@@ -61,8 +60,10 @@ def get_batches_per_gen(env: BaseEnvironment, batch_size: int) -> int:
 
     if torch.cuda.is_available():
         avail_mem = torch.cuda.get_device_properties(device).total_memory
+        max_memory_frac = 0.8
     else:
         avail_mem = psutil.virtual_memory().total
+        max_memory_frac = 0.5
     avail_mem *= max_memory_frac
 
     num_batches = avail_mem // total_batch_memory

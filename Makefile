@@ -21,7 +21,7 @@ all:
 
 lib/libdsc.so:
 	make lib/unique.so
-	$(CC) -o $@ lib/unique.so $(CSHARED)
+	$(CC) -o $@ lib/unique.so $(CFLAGS) $(CSHARED)
 
 lib/unique.so:
 	$(CC) -o $@ deepspeedcube/c/unique.c deepspeedcube/c/hashmap.c/*.c $(CFLAGS) $(CSHARED)
