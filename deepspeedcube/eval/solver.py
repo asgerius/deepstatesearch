@@ -53,3 +53,33 @@ class GreedyValueSolver(Solver):
             state = self.env.move(action, state)
 
         return None, None
+
+class AStar(Solver):
+
+    _frontier_size = 10 ** 4
+
+    def __init__(self, env: Environment, max_time: float | None, models: list[Model], l: float, N: int, d: int):
+        super().__init__(env, max_time)
+        self.models = models
+        self.l = l
+        self.N = N
+        self.d = d
+
+        for model in self.models:
+            model.eval()
+
+    @staticmethod
+    def _expand_frontier(frontier: torch.Tensor):
+        return torch.vstack((frontier, torch.empty_like(frontier)))
+
+    @torch.no_grad()
+    def solve(self, state: torch.Tensor) -> tuple[torch.Tensor | None, float | None]:
+        self.tt.tick()
+
+        self._frontier = torch.empty((self._frontier_size, len(state)), dtype=self.env.dtype, device=device)
+
+        actions = list()
+        while self.tt.tock() < self.max_time:
+            pass
+
+        return None, None

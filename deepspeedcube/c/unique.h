@@ -1,7 +1,7 @@
 #ifndef UNIQUEH
 #define UNIQUEH
 
-#include <string.h>
+#include "astar.h"
 #include "hashmap.c/hashmap.h"
 
 int unique(

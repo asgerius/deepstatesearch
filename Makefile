@@ -20,8 +20,16 @@ all:
 	make lib/cube_cuda.so
 
 lib/libdsc.so:
+	make lib/astar.so
+	make lib/heap.so
 	make lib/unique.so
 	$(CC) -o $@ lib/unique.so $(CFLAGS) $(CSHARED)
+
+lib/astar.so:
+	$(CC) -o $@ deepspeedcube/c/astar.c $(CFLAGS) $(CSHARED)
+
+lib/heap.so:
+	$(CC) -o $@ deepspeedcube/c/heap.c $(CFLAGS) $(CSHARED)
 
 lib/unique.so:
 	$(CC) -o $@ deepspeedcube/c/unique.c deepspeedcube/c/hashmap.c/*.c $(CFLAGS) $(CSHARED)
