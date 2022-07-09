@@ -76,7 +76,9 @@ class AStar(Solver):
     def solve(self, state: torch.Tensor) -> tuple[torch.Tensor | None, float | None]:
         self.tt.tick()
 
-        self._frontier = torch.empty((self._frontier_size, len(state)), dtype=self.env.dtype, device=device)
+        self._frontier_values = torch.empty(self._frontier_size, dtype=torch.float32)
+        self._frontier_index  = torch.empty(self._frontier_size, dtype=torch.long)
+        self._frontier_states = torch.empty((self._frontier_size, len(state)), dtype=self.env.dtype, device=device)
 
         actions = list()
         while self.tt.tock() < self.max_time:

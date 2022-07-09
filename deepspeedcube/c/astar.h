@@ -11,6 +11,7 @@ struct hm_entry {
     void *p_elem;
     size_t bytes;
 };
+
 typedef struct hm_entry hm_entry;
 
 uint64_t hash(const void *elem, uint64_t seed0, uint64_t seed1);
