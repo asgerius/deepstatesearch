@@ -25,13 +25,55 @@ void bubble_up(heap heap, size_t index) {
         memcpy(data_parent, data_tmp,    heap.element_size);
 
         bubble_up(heap, index_parent);
-    } else {
-        return;
     }
 }
 
-void bubble_down(heap heap, size_t index);
+void bubble_down(heap heap, size_t index) {
+    if (index == heap.num_elems) {
+        return;
+    }
 
+    size_t index_left = HEAP_LEFT(index);
+    size_t index_right = HEAP_RIGHT(index);
+
+    if (index_left > heap.num_elems) {
+        // No children, so stop here
+        return;
+    } else if (index_right > heap.num_elems) {
+        // Only the left child exist, so make both children the same to
+        // make all following logic work without the need for exceptions
+        index_right = index_left;
+    }
+
+    float key_node = heap.keys[index];
+    float key_left = heap.keys[index_left];
+    float key_right = heap.keys[index_right];
+
+    float key_child;
+    size_t index_child;
+    if (key_left < key_right) {
+        key_child = key_left;
+        index_child = index_left;
+    } else {
+        key_child = key_right;
+        index_child = index_right;
+    }
+
+    if (key_node > key_child) {
+        heap.keys[index] = key_child;
+        heap.keys[index_child] = key_node;
+
+        void *data_tmp = malloc(heap.element_size);
+        void *data_node = heap.data + index * heap.element_size;
+        void *data_child = heap.data + index_child * heap.element_size;
+
+        memcpy(data_tmp,   data_node,  heap.element_size);
+        memcpy(data_node,  data_child, heap.element_size);
+        memcpy(data_child, data_tmp,   heap.element_size);
+
+        bubble_down(heap, index_child);
+    }
+}
 
 heap_entry heap_extract_min(heap heap) {
     float key_min = heap.keys[1];
