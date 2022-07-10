@@ -42,30 +42,27 @@ struct heap {
     float *keys;
     void *data;
     size_t element_size;
-    size_t num_elems;       // Includes null element
-    size_t allocated_size;  // Number of allocated elements including null element
-};
-
-struct heap_entry {
-    float key;
-    void *data;
+    // Number of elements (including null element) in the heap
+    // This will always be less than or equal to the number of elements
+    // that memory has been allocated for
+    size_t num_elems;
 };
 
 typedef struct heap heap;
-typedef struct heap_entry heap_entry;
 
-heap_entry heap_min(heap heap) {
-    heap_entry entry = {
-        .key = heap.keys[1],
-        .data = heap.data + heap.element_size,
-    };
-    return entry;
-}
+/* Allocates room for an empty heap. */
+heap *heap_alloc(float *keys, void *data, size_t element_size);
 
-heap_entry heap_extract_min(heap heap);
+/* Frees the heap. The arrays are owned by numpy/torch, so they are not freed here. */
+void heap_free(heap *heap);
 
-void heap_insert(heap heap, heap_entry entry);
+/* Updates the key and data pointers in the heap. Useful when changing allocated memory. */
+void heap_update_ptrs(heap *heap, float *keys, void *data);
 
-void heap_decrease_key(heap heap, size_t index, float key);
+void heap_extract_min(heap *heap, size_t n, float *keys, void *data);
+
+void heap_insert(heap *heap, size_t n, float *keys, void *data);
+
+void heap_decrease_key(heap *heap, size_t index, float key);
 
 #endif

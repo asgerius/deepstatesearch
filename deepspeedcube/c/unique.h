@@ -2,6 +2,7 @@
 #define UNIQUEH
 
 #include "astar.h"
+#include "hashmap_plus.h"
 #include "hashmap.c/hashmap.h"
 
 int unique(

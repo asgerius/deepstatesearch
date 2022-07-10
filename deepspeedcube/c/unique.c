@@ -8,14 +8,14 @@ int unique(
     unsigned long *index,
     unsigned long *inverse
 ) {
-    hashmap *map = new_hashmap();
+    hashmap *map = create_hashmap();
 
     size_t n_unique = 0;
     size_t i;
     for (i = 0; i < n; ++ i) {
         // Construct element
         const hm_entry this_elem = {
-            .p_elem = array + stride * i,
+            .p_elem = array + i * stride,
             .bytes = stride,
         };
         // Check if already in map

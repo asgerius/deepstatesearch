@@ -19,7 +19,7 @@ def ptr(arr: torch.Tensor) -> ctypes:
 
 def tensor_size(x: np.ndarray | torch.Tensor) -> int:
     if isinstance(x, np.ndarray):
-        x = x.numpy()
+        x = torch.from_numpy(x)
     return x.element_size() * x.numel()
 
 def unique(x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
