@@ -17,7 +17,9 @@ all:
 	mkdir -p lib
 	make lib/libdsc.so
 	make lib/cube.so
-	make lib/cube_cuda.so
+	@if command -v nvcc ; then\
+		make lib/cube_cuda.so;\
+	fi
 
 lib/libdsc.so:
 	make lib/astar.so

@@ -133,7 +133,6 @@ void heap_insert(heap *heap, size_t n, float *keys, void *data) {
 
         bubble_up(heap, heap->num_elems);
     }
-
 }
 
 void heap_decrease_key(heap *heap, size_t index, float key) {
