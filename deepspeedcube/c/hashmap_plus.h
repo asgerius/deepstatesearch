@@ -1,4 +1,4 @@
-/* Utilities hashmap.c */
+/* Utilities for using hashmap.c */
 #ifndef HASHMAPPLUSH
 #define HASHMAPPLUSH
 

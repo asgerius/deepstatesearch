@@ -4,30 +4,31 @@ import ctypes
 
 import torch
 
-from deepspeedcube import LIBDSC, ptr, tensor_size
+from deepspeedcube import LIBDSC, ptr
 
 
 class MinHeap:
 
     _init_heap_size = 10_000
 
-    def __init__(self, sample_array: torch.Tensor):
+    def __init__(self, array_shape: torch.Size, dtype: torch.dtype):
 
         # Heap size including null element
         self._num_elems = 1
 
-        self._sample_array = sample_array.clone()
+        self._array_shape = array_shape
+        self._dtype = dtype
 
         self._keys = torch.empty(self._init_heap_size)
         self._data = torch.empty(
-            (self._init_heap_size, *sample_array.shape),
-            dtype=sample_array.dtype,
+            (self._init_heap_size, *array_shape),
+            dtype=dtype,
         )
 
         self._heap_ptr = ctypes.c_void_p(LIBDSC.heap_alloc(
             ptr(self._keys),
             ptr(self._data),
-            tensor_size(sample_array),
+            torch.tensor([], dtype=dtype).element_size() * array_shape.numel(),
         ))
 
     def min(self) -> tuple[float, torch.Tensor]:
@@ -45,7 +46,7 @@ class MinHeap:
         self._num_elems -= 1
 
         key = torch.empty(1)
-        data = torch.empty_like(self._sample_array)
+        data = torch.empty(self._array_shape, dtype=self._dtype)
 
         LIBDSC.heap_extract_min(
             self._heap_ptr,
@@ -66,8 +67,8 @@ class MinHeap:
 
         keys = torch.empty(n)
         data = torch.empty(
-            (n, *self._sample_array.shape),
-            dtype=self._sample_array.shape,
+            (n, *self._array_shape),
+            dtype=self._dtype,
         )
 
         LIBDSC.heap_extract_min(
@@ -76,6 +77,8 @@ class MinHeap:
             ptr(keys),
             ptr(data),
         )
+
+        return keys, data
 
     def insert(self, key: float, array: torch.Tensor):
 

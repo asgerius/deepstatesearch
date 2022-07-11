@@ -1,5 +1,6 @@
 #include "hashmap_plus.h"
 
+
 uint64_t hash(const void *elem, uint64_t seed0, uint64_t seed1) {
     const hm_entry *e = elem;
     return hashmap_murmur(e->p_elem, e->bytes, seed0, seed1);

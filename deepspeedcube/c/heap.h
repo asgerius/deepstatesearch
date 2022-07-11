@@ -59,6 +59,8 @@ void heap_free(heap *heap);
 /* Updates the key and data pointers in the heap. Useful when changing allocated memory. */
 void heap_update_ptrs(heap *heap, float *keys, void *data);
 
+/* Extracts the n lowest keys in the heap and puts the resulting keys and data in the
+given arrays in order of ascending keys. */
 void heap_extract_min(heap *heap, size_t n, float *keys, void *data);
 
 void heap_insert(heap *heap, size_t n, float *keys, void *data);
