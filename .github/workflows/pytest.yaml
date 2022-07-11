@@ -27,5 +27,10 @@ jobs:
 
       - name: Run test
         run: |
+          export PATH=$PATH:.
           export PYTHONPATH=$PYTHONPATH:.
+          echo $PATH
+          echo $PYTHONPATH
+          ls
+          ls lib
           pytest --cov deepspeedcube
