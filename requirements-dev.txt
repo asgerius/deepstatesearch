@@ -1,2 +1,2 @@
-flake8>=4.0
-pip8-naming>=0.12
+pytest>=7.1
+pytest-cov>=3.0
