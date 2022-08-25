@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <cuda.h>
 #include "cube.h"
-#include <stdio.h>
 
 #define K 16
 

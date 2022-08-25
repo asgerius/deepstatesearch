@@ -34,7 +34,7 @@ def eval(job: JobDescription):
     log.section("Loading configurations")
     eval_cfg = EvalConfig(
         solver           = job.solver,
-        depths           = list(range(job.max_depth+1)),
+        depths           = [10], # list(range(job.max_depth+1)),
         states_per_depth = job.states_per_depth,
         max_time         = job.max_time,
         astar_lambda     = job.astar_lambda,

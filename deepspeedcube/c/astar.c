@@ -1,141 +1,188 @@
 #include "astar.h"
 
 
-uint64_t astar_hash(const void *elem, uint64_t seed0, uint64_t seed1) {
-    const node *e = elem;
-    return hashmap_murmur(e->state, e->state_size, seed0, seed1);
+uint64_t hash_node(const void *elem, uint64_t seed0, uint64_t seed1) {
+    const node *node = elem;
+    return hashmap_murmur(node->state, node->state_size, seed0, seed1);
 }
 
-int astar_compare(const void *elem1, const void *elem2, void *udata) {
-    // Compares two array elements
-    const node *e1 = elem1;
-    const node *e2 = elem2;
-    return memcmp(e1->state, e2->state, e1->state_size);
+int compare_nodes(const void *elem1, const void *elem2, void *udata) {
+    const node *node1 = elem1;
+    const node *node2 = elem2;
+    return memcmp(node1->state, node2->state, node1->state_size);
 }
 
-void astar_node_free(void *elem) {
-    node *e = elem;
-    free(e->state);
-    free(e);
-}
-
-state_map *astar_init_state_map(float lambda, size_t state_size) {
-    state_map *map_p = malloc(sizeof(*map_p));
-    map_p->lambda = lambda;
-    map_p->num_states = 0;
-    map_p->state_size = state_size;
-    map_p->map = hashmap_new(sizeof(node), 0, 0, 0, astar_hash, astar_compare, astar_node_free, NULL);
-
-    return map_p;
-}
-
-void astar_free_state_map(state_map *map_p) {
-    hashmap_free(map_p->map);
-    free(map_p);
-}
-
-void astar_insert_bfs_states(
-    state_map *map,
-    size_t num_states,
-    void *states,
-    float *g,
-    size_t *back_actions
+node *init_node(
+    action arrival_action,
+    float f,
+    size_t g,
+    size_t state_size,
+    void *state
 ) {
-    // Iterate in reverse order in case of duplicate states
-    // States earliest in the array will be those with the shortest
-    size_t i;
-    for (i = num_states - 1; i > - 1; -- i) {
-        void *state_arr = malloc(map->state_size);
-        memcpy(state_arr, states + i * map->state_size, map->state_size);
-        node state_node = {
-            .f = 0,
-            .g = g[i],
-            .back_action = back_actions[i],
-            .state_size = map->state_size,
-            .state = state_arr,
-        };
-        hashmap_set(map->map, &state_node);
-    }
+    node *node_p = malloc(sizeof(node));
+
+    node_p->arrival_action = arrival_action;
+    node_p->f = f;
+    node_p->g = g;
+    node_p->state_size = state_size;
+    node_p->state = malloc(state_size);
+    memcpy(node_p->state, state, state_size);
+
+    return node_p;
 }
 
-void astar_update_search_state(
-    // States that used to be in the frontier
-    size_t num_states,
-    void *states,
-    // States and h estimates from the NN
+void free_node(void *elem) {
+    node *node = elem;
+    free(node->state);
+}
+
+astar_search *astar_init(
+    size_t state_size,
+    heap *frontier
+) {
+    astar_search *search = malloc(sizeof(astar_search));
+    search->longest_path = 0;
+    search->state_size = state_size;
+    search->frontier = frontier;
+    search->node_map = hashmap_new(sizeof(node), 0, 0, 0, hash_node, compare_nodes, free_node, NULL);
+
+    return search;
+}
+
+void astar_free(astar_search *search) {
+    // The frontier is not freed here, as it is owned and freed by
+    // the MinHeap structure in Python
+    hashmap_free(search->node_map);
+    free(search);
+}
+
+void astar_add_initial_state(
+    float h,
+    void *state,
+    astar_search *search
+) {
+    node *new_node_p = init_node(
+        NULL_ACTION, h, 0, search->state_size, state
+    );
+
+    hashmap_set(search->node_map, new_node_p);
+}
+
+size_t astar_insert_neighbours(
+    size_t num_current_states,  // 1 until batched A* is implemented
+    void *current_states,
     size_t num_neighbour_states,
     void *neighbour_states,
     float *h,
-    // Actions taken from neighbour_states to get back to states
-    size_t *back_actions,
-    // Index i contains the index into states that neighbour_states[i] came from
-    size_t *from_state_index,
-
-    state_map *map_p,
-    heap *frontier
+    action *arrival_actions,
+    astar_search *search
 ) {
-    struct hashmap *hashmap = map_p->map;
-    size_t state_size = map_p->state_size;
 
-    // g scores in the states that were expanded from
-    // These are precomputed for ease of use
-    float *g_from = malloc(num_states * sizeof(*g_from));
-    size_t i;
-    #pragma omp parallel for
-    for (i = 0; i < num_states; ++ i) {
-        void *state = states + i * state_size;
+    // A temporary node used for node lookups. The state pointer is changed
+    // such that it is not necessary to create new nodes just for looking up
+    // existing nodes. Do NOT use for creating new nodes, as the state pointer
+    // may change or be freed. Instead, use init_node, which creates a new node
+    // which has its own dedicated memory for the state.
+    node tmp_node = {
+        .arrival_action = NULL_ACTION,
+        .f = 0, .g = 0,
+        .state_size = search->state_size,
+        .state = NULL,
+    };
 
-        node *state_node = hashmap_get(hashmap, state);
-        g_from[i] = state_node->g;
-    }
+    // i is the number of the current state, and j is the j'th neighbour of i
+    size_t neighbours_per_state = num_neighbour_states / num_current_states;
+    size_t i, j;
+    for (i = 0; i < num_current_states; ++ i) {
+        void *current = current_states + i * neighbours_per_state * search->state_size;
 
-    for (i = 0; i < num_neighbour_states; ++ i) {
-        const void *neighbour_state = neighbour_states + i * map_p->state_size;
+        tmp_node.state = current;
+        node *current_node = hashmap_get(search->node_map, &tmp_node);
+        size_t g_current = current_node->g;
+        printf("g_current = %zu\n", g_current);
 
-        node *neighbour_node = hashmap_get(hashmap, neighbour_state);
-        float g = g_from[from_state_index[i]] + 1;
+        for (j = 0; j < neighbours_per_state; ++ j) {
+            size_t neighbour_index = i * neighbours_per_state + j;
+            void *neighbour = neighbour_states + neighbour_index * search->state_size;
 
-        if (neighbour_node != NULL) {
-            // State already seen, so relax if a shorter path has been found
-            float prev_g = neighbour_node->g;
-            if (g < prev_g) {
-                // Shorter path, so relax
-                neighbour_node->g = g;
-                neighbour_node->f = g + map_p->lambda * h[i];
+            size_t g_tentative = g_current + 1;
+            tmp_node.state = neighbour;
+            node *neighbour_node = hashmap_get(search->node_map, &tmp_node);
+            // printf("Neighbour node at %p, %zu, %zu\n", neighbour_node, g_tentative, neighbour_node->g);
+
+            if (neighbour_node != NULL && g_tentative < neighbour_node->g) {
+                // Node has been seen before and has shorter path to it
+                neighbour_node->f = g_tentative + h[neighbour_index];
+                neighbour_node->g = g_tentative;
+                printf("Existing node");
+                neighbour_node->arrival_action = neighbour_index;
+                // heap_insert(search->frontier, 1, &neighbour_node->f, &neighbour_node->state);
+            } else if (neighbour_node == NULL) {
+                // Node has not been seen before, so add to node map and frontier
+                node *new_node_p = init_node(
+                    neighbour_index,
+                    g_tentative + h[neighbour_index],
+                    g_tentative,
+                    search->state_size,
+                    neighbour
+                );
+                hashmap_set(search->node_map, new_node_p);
+                search->longest_path = MAX(search->longest_path, new_node_p->g);
+                heap_insert(search->frontier, 1, &new_node_p->f, new_node_p->state);
             }
-        } else {
-            // New state, so add to frontier and map
-            float new_f = g + map_p->lambda * h[i];
-            heap_insert(frontier, 1, &new_f, neighbour_state);
-
-            void *state_arr = malloc(state_size);
-            memcpy(state_arr, neighbour_state, state_size);
-            node new_node = {
-                .f = new_f,
-                .g = g,
-                .back_action = back_actions[i],
-                .state_size = state_size,
-                .state = state_arr,
-            };
-
-            hashmap_set(hashmap, &new_node);
         }
     }
+
+    return search->frontier->num_elems + 1;
 }
 
-size_t *astar_get_back_actions(
-    size_t state_size,
-    void *solved_state,
-    state_map *map
-) {
-    node *state_node = hashmap_get(map->map, solved_state);
-    size_t g = round(state_node->g);
-    size_t *back_actions = malloc(g * sizeof(*back_actions));
+size_t astar_longest_path(astar_search *search) {
+    return search->longest_path;
+}
 
-    -- g;
-    for (g; g > -1; -- g) {
-        back_actions[g] = state_node->back_action;
+void print_state(unsigned char *state) {
+    size_t i = 0;
+    for (i; i < 20; ++ i) {
+        if (state[i] < 10) {
+            printf("0%hhu ", state[i]);
+        } else {
+            printf("%hhu ", state[i]);
+        }
+    }
+    printf("\n");
+}
+
+size_t astar_retrace_path(
+    int action_space_size,
+    action *actions,  // Actions to solve the initial state go here (in reverse order)
+    action *reverse_actions,  // index i gives the reverse of action i
+    void *final_state,  // Final state seen that expands to solved state
+    void (act)(void *state, void *action, size_t num_actions),
+    astar_search *search
+) {
+    node tmp_node = {
+        .f = 0, .g = 0,
+        .arrival_action = NULL_ACTION,
+        .state_size = search->state_size,
+        .state = final_state,
+    };
+    node *current_node = hashmap_get(search->node_map, &tmp_node);
+    printf("Got node at %p\n", current_node);
+
+    size_t i = 1;
+    while (current_node->arrival_action != NULL_ACTION) {
+        actions[i] = current_node->arrival_action;
+        if (actions[i] == NULL_ACTION) {
+            break;
+        }
+
+        // At this point, we can fuck up the states, so never mind inplace movements
+        action reverse_action = reverse_actions[current_node->arrival_action];
+        act(current_node->state, &reverse_action, 1);
+        current_node = hashmap_get(search->node_map, current_node);
+
+        ++ i;
     }
 
-    return back_actions;
+    return i;
 }
