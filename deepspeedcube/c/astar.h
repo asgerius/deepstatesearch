@@ -7,8 +7,6 @@
 #include <string.h>
 #include "heap.h"
 
-#include <stdio.h>
-
 #include "envs/cube.h"
 #include "hashmap.c/hashmap.h"
 

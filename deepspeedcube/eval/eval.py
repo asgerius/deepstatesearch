@@ -35,7 +35,7 @@ def eval(job: JobDescription):
     log.section("Loading configurations")
     eval_cfg = EvalConfig(
         solver           = job.solver,
-        depths           = [15], # list(range(job.max_depth+1)),
+        depths           = list(range(job.max_depth+1)),
         states_per_depth = job.states_per_depth,
         max_time         = job.max_time,
         astar_lambda     = job.astar_lambda,
@@ -92,7 +92,9 @@ def eval(job: JobDescription):
         log("Evaluating at depth %i" % depth)
         results.solved.append(0)
         results.solve_times.append(list())
+
         TT.profile("Evaluate at depth %i" % depth)
+
         for state in states[i]:
             actions, time = solver.solve(state)
 
@@ -102,10 +104,18 @@ def eval(job: JobDescription):
 
                 if eval_cfg.validate:
                     TT.profile("Validate")
+                    new_state = state
                     for action in actions:
-                        state = env.move(action, state)
-                    assert env.is_solved(state)
+                        new_state = env.move(action, new_state)
+                    if not env.is_solved(new_state):
+                        log.error(
+                            "State %s was not solved" % state,
+                            "Actions:     %s" % actions,
+                            "Final state: %s" % new_state,
+                        )
+                        raise RuntimeError("Failed to solve state")
                     TT.end_profile()
+
         TT.end_profile()
 
     log.section("Saving")

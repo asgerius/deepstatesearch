@@ -79,7 +79,7 @@ class AStar(Solver):
         from pelutils import log
         self.tt.tick()
 
-        state = state.cpu()
+        state = state.cpu().clone()
 
         if self.env.is_solved(state):
             return torch.tensor([], dtype=torch.long), self.tt.tock()
@@ -108,8 +108,7 @@ class AStar(Solver):
         while self.tt.tock() < self.max_time:
             TT.profile("Iteration")
 
-            _, state = frontier.extract_min()
-            current_states = state.unsqueeze(0)
+            _, current_states = frontier.extract_min_multiple(self.N)
             neighbour_states = self.env.neighbours(current_states)
 
             # Make sure there is enough space in the heap, as astar_insert_neighbours
@@ -121,8 +120,9 @@ class AStar(Solver):
                 longest_path = LIBDSC.astar_longest_path(search_state_p) + 1
                 print("Longest path: %i" % longest_path)
                 actions = torch.empty(longest_path, dtype=torch.uint8)
-                actions[0] = torch.where(self.env.multiple_is_solved(neighbour_states))[0][0]
-                final_state = current_states[0]
+                solved_state_index = torch.where(self.env.multiple_is_solved(neighbour_states))[0][0].item()
+                actions[0] = solved_state_index % len(self.env.action_space)
+                final_state = current_states[solved_state_index // len(self.env.action_space)]
                 solved = True
                 TT.end_profile()
                 break
@@ -135,7 +135,7 @@ class AStar(Solver):
                 ctypes.c_size_t(len(neighbour_states)),
                 ptr(neighbour_states),
                 ptr(h),
-                ptr(self.env.action_space),
+                ptr(self.env.action_space.repeat(len(current_states))),
                 search_state_p,
             )
 
@@ -143,6 +143,7 @@ class AStar(Solver):
 
         if solved:
             print("WE DID IT BOIZ")
+            print(state)
             with TT.profile("Retrace path"):
                 # Solved state has not been added, so add 1 to maximum solution length
                 reverse_actions = self.env.reverse_moves(self.env.action_space)

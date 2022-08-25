@@ -69,7 +69,7 @@ void astar_add_initial_state(
 }
 
 size_t astar_insert_neighbours(
-    size_t num_current_states,  // 1 until batched A* is implemented
+    size_t num_current_states,
     void *current_states,
     size_t num_neighbour_states,
     void *neighbour_states,
@@ -94,12 +94,11 @@ size_t astar_insert_neighbours(
     size_t neighbours_per_state = num_neighbour_states / num_current_states;
     size_t i, j;
     for (i = 0; i < num_current_states; ++ i) {
-        void *current = current_states + i * neighbours_per_state * search->state_size;
+        void *current = current_states + i * search->state_size;
 
         tmp_node.state = current;
         node *current_node = hashmap_get(search->node_map, &tmp_node);
         size_t g_current = current_node->g;
-        printf("g_current = %zu\n", g_current);
 
         for (j = 0; j < neighbours_per_state; ++ j) {
             size_t neighbour_index = i * neighbours_per_state + j;
@@ -108,19 +107,16 @@ size_t astar_insert_neighbours(
             size_t g_tentative = g_current + 1;
             tmp_node.state = neighbour;
             node *neighbour_node = hashmap_get(search->node_map, &tmp_node);
-            // printf("Neighbour node at %p, %zu, %zu\n", neighbour_node, g_tentative, neighbour_node->g);
 
             if (neighbour_node != NULL && g_tentative < neighbour_node->g) {
                 // Node has been seen before and has shorter path to it
                 neighbour_node->f = g_tentative + h[neighbour_index];
                 neighbour_node->g = g_tentative;
-                printf("Existing node");
-                neighbour_node->arrival_action = neighbour_index;
-                // heap_insert(search->frontier, 1, &neighbour_node->f, &neighbour_node->state);
+                neighbour_node->arrival_action = j;
             } else if (neighbour_node == NULL) {
                 // Node has not been seen before, so add to node map and frontier
                 node *new_node_p = init_node(
-                    neighbour_index,
+                    j,
                     g_tentative + h[neighbour_index],
                     g_tentative,
                     search->state_size,
@@ -140,18 +136,6 @@ size_t astar_longest_path(astar_search *search) {
     return search->longest_path;
 }
 
-void print_state(unsigned char *state) {
-    size_t i = 0;
-    for (i; i < 20; ++ i) {
-        if (state[i] < 10) {
-            printf("0%hhu ", state[i]);
-        } else {
-            printf("%hhu ", state[i]);
-        }
-    }
-    printf("\n");
-}
-
 size_t astar_retrace_path(
     int action_space_size,
     action *actions,  // Actions to solve the initial state go here (in reverse order)
@@ -167,7 +151,6 @@ size_t astar_retrace_path(
         .state = final_state,
     };
     node *current_node = hashmap_get(search->node_map, &tmp_node);
-    printf("Got node at %p\n", current_node);
 
     size_t i = 1;
     while (current_node->arrival_action != NULL_ACTION) {
