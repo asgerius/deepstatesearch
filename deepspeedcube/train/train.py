@@ -119,7 +119,8 @@ def train(job: JobDescription):
             for model in models:
                 model.eval()
 
-            states_d, depths = gen_new_states(env, 10 ** 4, train_cfg.scramble_depth)
+            states, depths = gen_new_states(env, 10 ** 4, train_cfg.scramble_depth)
+            states_d = states.to(device)
             states_oh = env.multiple_oh(states_d)
             with TT.profile("Value estimates"), torch.no_grad():
                 preds = torch.zeros(len(states_d), device=device)
@@ -142,9 +143,6 @@ def train(job: JobDescription):
 
         if i % batches_per_gen == 0:
             num_states = batches_per_gen * train_cfg.batch_size * train_cfg.num_models
-            for j in range(train_cfg.num_models):
-                models[j] = models[j].cpu()
-                gen_models[j] = gen_models[j].cpu()
             log(
                 "Generating states:",
                 "States:     %s" % thousands_seperators(num_states),
@@ -159,24 +157,20 @@ def train(job: JobDescription):
                 )
             with TT.profile("Generate neighbour states"):
                 all_neighbour_states = env.neighbours(all_states)
-            with TT.profile("Send states to CPU"):
-                all_states = all_states.cpu().view(
-                    batches_per_gen,
-                    train_cfg.num_models,
-                    train_cfg.batch_size,
-                    *env.get_solved().shape,
-                )
-                all_neighbour_states = all_neighbour_states.cpu().view(
-                    batches_per_gen,
-                    train_cfg.num_models,
-                    train_cfg.batch_size * len(env.action_space),
-                    *env.get_solved().shape,
-                )
-            log.debug("Size of states in bytes: %s" % thousands_seperators(tensor_size(all_states)))
 
-            for j in range(train_cfg.num_models):
-                models[j] = models[j].to(device)
-                gen_models[j] = gen_models[j].to(device)
+            all_states = all_states.view(
+                batches_per_gen,
+                train_cfg.num_models,
+                train_cfg.batch_size,
+                *env.get_solved().shape,
+            )
+            all_neighbour_states = all_neighbour_states.view(
+                batches_per_gen,
+                train_cfg.num_models,
+                train_cfg.batch_size * len(env.action_space),
+                *env.get_solved().shape,
+            )
+            log.debug("Size of states in bytes: %s" % thousands_seperators(tensor_size(all_states)))
 
         for j in range(train_cfg.num_models):
             log.debug("Training model %i / %i" % (j+1, train_cfg.num_models))
@@ -205,7 +199,7 @@ def train(job: JobDescription):
                     torch.cuda.synchronize()
 
             with TT.profile("Set solved states to j = 0"):
-                solved_states = env.multiple_is_solved(neighbour_states_d)
+                solved_states = env.multiple_is_solved(neighbour_states)
                 J[solved_states] = 0
             J = J.view(len(states_d), len(env.action_space))
 

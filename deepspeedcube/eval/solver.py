@@ -76,10 +76,9 @@ class AStar(Solver):
 
     @torch.no_grad()
     def solve(self, state: torch.Tensor) -> tuple[torch.Tensor | None, float | None]:
-        from pelutils import log
         self.tt.tick()
 
-        state = state.cpu().clone()
+        state = state.clone()
 
         if self.env.is_solved(state):
             return torch.tensor([], dtype=torch.long), self.tt.tock()
@@ -88,19 +87,15 @@ class AStar(Solver):
 
         frontier = MinHeap(state.size(), state.dtype)
 
-        log("Creating search state")
         search_state_p = ctypes.c_void_p(LIBDSC.astar_init(
             ctypes.c_size_t(tensor_size(state)),
             frontier._heap_ptr,
         ))
 
-        log("Calculating h")
         # Insert initial state into frontier and node map
         h = self.h(state.unsqueeze(0))[0].item()
 
         LIBDSC.astar_add_initial_state(h, ptr(state), search_state_p)
-
-        log("Inserting into frontier")
         frontier.insert(h, state)
 
         solved = False
@@ -108,17 +103,18 @@ class AStar(Solver):
         while self.tt.tock() < self.max_time:
             TT.profile("Iteration")
 
-            _, current_states = frontier.extract_min_multiple(self.N)
+            with TT.profile("Extract from frontier"):
+                _, current_states = frontier.extract_min_multiple(self.N)
             neighbour_states = self.env.neighbours(current_states)
 
             # Make sure there is enough space in the heap, as astar_insert_neighbours
             # usually adds new states without allocating more memory
             while frontier._num_elems + len(neighbour_states) > len(frontier._keys):
-                frontier._expand_heap()
+                with TT.profile("Expand frontier"):
+                    frontier._expand_heap()
 
             if self.env.multiple_is_solved(neighbour_states).any():
                 longest_path = LIBDSC.astar_longest_path(search_state_p) + 1
-                print("Longest path: %i" % longest_path)
                 actions = torch.empty(longest_path, dtype=torch.uint8)
                 solved_state_index = torch.where(self.env.multiple_is_solved(neighbour_states))[0][0].item()
                 actions[0] = solved_state_index % len(self.env.action_space)
@@ -129,21 +125,20 @@ class AStar(Solver):
 
             h = self.h(neighbour_states)
 
-            frontier._num_elems = LIBDSC.astar_insert_neighbours(
-                ctypes.c_size_t(len(current_states)),
-                ptr(current_states),
-                ctypes.c_size_t(len(neighbour_states)),
-                ptr(neighbour_states),
-                ptr(h),
-                ptr(self.env.action_space.repeat(len(current_states))),
-                search_state_p,
-            )
+            with TT.profile("Update search state"):
+                frontier._num_elems = LIBDSC.astar_insert_neighbours(
+                    ctypes.c_size_t(len(current_states)),
+                    ptr(current_states),
+                    ctypes.c_size_t(len(neighbour_states)),
+                    ptr(neighbour_states),
+                    ptr(h),
+                    ptr(self.env.action_space.repeat(len(current_states))),
+                    search_state_p,
+                )
 
             TT.end_profile()
 
         if solved:
-            print("WE DID IT BOIZ")
-            print(state)
             with TT.profile("Retrace path"):
                 # Solved state has not been added, so add 1 to maximum solution length
                 reverse_actions = self.env.reverse_moves(self.env.action_space)
@@ -155,7 +150,6 @@ class AStar(Solver):
                     LIBDSC.cube_multi_act,
                     search_state_p,
                 )
-                print(actions, num_actions)
                 actions = actions[:num_actions].flip(0)
 
         LIBDSC.astar_free(search_state_p)

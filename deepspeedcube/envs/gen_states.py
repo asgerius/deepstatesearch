@@ -6,7 +6,7 @@ import psutil
 import torch
 from pelutils import TT, log, thousands_seperators
 
-from deepspeedcube import device, tensor_size
+from deepspeedcube import tensor_size
 from deepspeedcube.envs import Environment
 
 
@@ -15,7 +15,7 @@ def gen_new_states(env: Environment, num_states: int, K: int) -> tuple[torch.Ten
 
     with TT.profile("Create states"):
         states = env.get_multiple_solved(states_per_depth*K)
-        scramble_depths = torch.zeros(len(states), dtype=torch.int16, device=device)
+        scramble_depths = torch.zeros(len(states), dtype=torch.int32)
 
     with TT.profile("Scramble states"):
         for i in range(K):
@@ -24,13 +24,12 @@ def gen_new_states(env: Environment, num_states: int, K: int) -> tuple[torch.Ten
             actions = torch.randint(
                 0, len(env.action_space), (n,),
                 dtype=torch.uint8,
-                device=device,
             )
             env.multiple_moves(actions, states[start:], inplace=True)
             scramble_depths[start:] += 1
 
     with TT.profile("Shuffle states"):
-        shuffle_index = torch.randperm(len(states), device=device)
+        shuffle_index = torch.randperm(len(states))
         states[:] = states[shuffle_index]
         scramble_depths[:] = scramble_depths[shuffle_index]
 
@@ -51,7 +50,6 @@ def gen_eval_states(env: Environment, states_per_depth: int, depths: list[int]) 
                 actions = torch.randint(
                     0, len(env.action_space), (n_states,),
                     dtype=torch.uint8,
-                    device=device,
                 )
                 env.multiple_moves(actions, states[start:], inplace=True)
 
@@ -79,12 +77,8 @@ def get_batches_per_gen(env: Environment, batch_size: int) -> int:
         thousands_seperators(total_batch_memory),
     )
 
-    if torch.cuda.is_available():
-        avail_mem = torch.cuda.get_device_properties(device).total_memory
-        max_memory_frac = 0.8
-    else:
-        avail_mem = psutil.virtual_memory().total
-        max_memory_frac = 0.5
+    avail_mem = psutil.virtual_memory().total
+    max_memory_frac = 0.5
     avail_mem *= max_memory_frac
 
     num_batches = avail_mem // total_batch_memory
