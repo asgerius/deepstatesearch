@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
     for i, job in enumerate(jobs):
         TT.reset()
-        log.configure(f"{job.location}/train.log")
+        log.configure(f"{job.location}/eval.log")
         with log.log_errors:
             log.section(f"Evaluating {i+1} / {len(jobs)}: {job.name}")
             log.log_repo()
@@ -37,4 +37,4 @@ if __name__ == "__main__":
                 sep="\n    ",
             )
             eval(job)
-            log("Time distribution", TT)
+            log.debug("Time distribution", TT)

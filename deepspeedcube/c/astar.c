@@ -51,11 +51,13 @@ astar_search *astar_init(
     return search;
 }
 
-void astar_free(astar_search *search) {
+size_t astar_free(astar_search *search) {
+    size_t num_states = hashmap_count(search->node_map);
     // The frontier is not freed here, as it is owned and freed by
     // the MinHeap structure in Python
     hashmap_free(search->node_map);
     free(search);
+    return num_states;
 }
 
 void astar_add_initial_state(

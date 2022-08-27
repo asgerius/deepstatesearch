@@ -16,6 +16,7 @@ LIBDSC = ctypes.cdll.LoadLibrary("lib/libdsc.so")
 
 LIBDSC.heap_alloc.restype = ctypes.c_void_p
 LIBDSC.astar_init.restype = ctypes.c_void_p
+LIBDSC.astar_free.restype = ctypes.c_size_t
 LIBDSC.astar_insert_neighbours.restype = ctypes.c_size_t
 LIBDSC.astar_longest_path.restype = ctypes.c_size_t
 LIBDSC.astar_retrace_path.restype = ctypes.c_size_t

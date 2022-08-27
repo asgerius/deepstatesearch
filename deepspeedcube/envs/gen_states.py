@@ -74,7 +74,7 @@ def get_batches_per_gen(env: Environment, batch_size: int) -> int:
     total_batch_memory = batch_size * (scramble_memory + neighbour_memory)
     log.debug(
         "Memory requirements for generating states for a batch of size %i:" % batch_size,
-        thousands_seperators(total_batch_memory),
+        thousands_seperators(total_batch_memory) + "B",
     )
 
     avail_mem = psutil.virtual_memory().total

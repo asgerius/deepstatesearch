@@ -22,8 +22,8 @@ class Solver(abc.ABC):
         self.tt = TickTock()
 
     @abc.abstractmethod
-    def solve(self, state: torch.Tensor) -> tuple[torch.Tensor | None, float | None]:
-        """ Returns tensor of actions to solve the given state and the time taken. """
+    def solve(self, state: torch.Tensor) -> tuple[torch.Tensor | None, float, int]:
+        """ Returns tensor of actions to solve the given state, the time spent is seconds, and the number of states seen. """
         pass
 
     @abc.abstractmethod
@@ -39,21 +39,25 @@ class GreedyValueSolver(Solver):
             model.eval()
 
     @torch.no_grad()
-    def solve(self, state: torch.Tensor) -> tuple[torch.Tensor | None, float | None]:
+    def solve(self, state: torch.Tensor) -> tuple[torch.Tensor | None, float, int]:
         self.tt.tick()
 
         state = state.clone()
 
         actions = list()
+        states_seen = 1
         while self.tt.tock() < self.max_time:
             TT.profile("Iteration")
 
             neighbours = self.env.neighbours(state.unsqueeze(dim=0))
+            # NB: This overestimates the number of states, as duplicates are not detected
+            # This is somewhat corrected by removing one, which is the previous state
+            states_seen += len(neighbours) - 1
             solved = self.env.multiple_is_solved(neighbours)
             if torch.any(solved):
                 actions.append(torch.where(solved)[0].item())
                 TT.end_profile()
-                return torch.tensor(actions), self.tt.tock()
+                return torch.tensor(actions), self.tt.tock(), states_seen
 
             neighbours_d = neighbours.to(device)
 
@@ -65,11 +69,11 @@ class GreedyValueSolver(Solver):
             action = preds.argmin().item()
             actions.append(action)
 
-            state = self.env.move(action, state)
+            state = neighbours[action]
 
             TT.end_profile()
 
-        return None, None
+        return None, self.tt.tock(), states_seen
 
     def __str__(self) -> str:
         return "Greedy Value"
@@ -93,7 +97,7 @@ class AStar(Solver):
         state = state.clone()
 
         if self.env.is_solved(state):
-            return torch.tensor([], dtype=torch.long), self.tt.tock()
+            return torch.tensor([], dtype=torch.long), self.tt.tock(), 1
 
         TT.profile("A*")
 
@@ -165,14 +169,14 @@ class AStar(Solver):
                 )
                 actions = actions[:num_actions].flip(0)
 
-        LIBDSC.astar_free(search_state_p)
+        states_seen = LIBDSC.astar_free(search_state_p)
 
         TT.end_profile()
 
         if solved:
-            return actions, self.tt.tock()
+            return actions, self.tt.tock(), states_seen
 
-        return None, self.tt.tock()
+        return None, self.tt.tock(), states_seen
 
     @torch.no_grad()
     def h(self, states: torch.Tensor) -> torch.Tensor:

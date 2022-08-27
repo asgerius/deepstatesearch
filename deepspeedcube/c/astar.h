@@ -42,7 +42,8 @@ astar_search *astar_init(
     heap *frontier
 );
 
-void astar_free(astar_search *search);
+/* Frees all allocated memory and returns number of states in the node map. */
+size_t astar_free(astar_search *search);
 
 void astar_add_initial_state(
     float h,
