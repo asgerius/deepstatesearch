@@ -21,9 +21,10 @@ class EvalConfig(DataStorage, json_name="eval_cfg.json", indent=4):
     states_per_depth: int
     max_time:         float
     astar_lambda:     float
-    astar_N:          int
+    astar_n:          int
     astar_d:          int
     validate:         bool
+    solver_name:      str
 
 @dataclass
 class EvalResults(DataStorage, json_name="eval_results.json", indent=4):
@@ -39,9 +40,10 @@ def eval(job: JobDescription):
         states_per_depth = job.states_per_depth,
         max_time         = job.max_time,
         astar_lambda     = job.astar_lambda,
-        astar_N          = job.astar_N,
+        astar_n          = job.astar_n,
         astar_d          = job.astar_d,
         validate         = job.validate,
+        solver_name      = ""  # Set later
     )
     log("Got eval config", eval_cfg)
 
@@ -76,10 +78,11 @@ def eval(job: JobDescription):
         solver = GreedyValueSolver(env, eval_cfg.max_time, models)
     elif eval_cfg.solver == "AStar":
         solver = AStar(env, eval_cfg.max_time, models,
-            eval_cfg.astar_lambda, eval_cfg.astar_N, eval_cfg.astar_d,
+            eval_cfg.astar_lambda, eval_cfg.astar_n, eval_cfg.astar_d,
         )
     else:
         raise ValueError("Unknown solver '%s'" % eval_cfg.solver)
+    eval_cfg.solver_name = str(solver)
 
     results = EvalResults(
         solved      = list(),

@@ -13,7 +13,7 @@ options = (
     Option("solver",           default="AStar"),
     Option("max-time",         default=1, type=float),
     Option("astar-lambda",     default=1, type=float),
-    Option("astar-N",          default=100),
+    Option("astar-n",          default=100),
     Option("astar-d",          default=1),
     Flag("validate"),
 )

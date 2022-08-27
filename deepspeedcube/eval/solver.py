@@ -26,6 +26,10 @@ class Solver(abc.ABC):
         """ Returns tensor of actions to solve the given state and the time taken. """
         pass
 
+    @abc.abstractmethod
+    def __str__(self) -> str:
+        pass
+
 class GreedyValueSolver(Solver):
 
     def __init__(self, env: Environment, max_time: float | None, models: list[Model]):
@@ -38,6 +42,8 @@ class GreedyValueSolver(Solver):
     def solve(self, state: torch.Tensor) -> tuple[torch.Tensor | None, float | None]:
         self.tt.tick()
 
+        state = state.clone()
+
         actions = list()
         while self.tt.tock() < self.max_time:
             TT.profile("Iteration")
@@ -46,9 +52,12 @@ class GreedyValueSolver(Solver):
             solved = self.env.multiple_is_solved(neighbours)
             if torch.any(solved):
                 actions.append(torch.where(solved)[0].item())
+                TT.end_profile()
                 return torch.tensor(actions), self.tt.tock()
 
-            neighbours_oh = self.env.multiple_oh(neighbours)
+            neighbours_d = neighbours.to(device)
+
+            neighbours_oh = self.env.multiple_oh(neighbours_d)
             preds = torch.zeros(len(neighbours_oh), device=device)
             for model in self.models:
                 preds += model(neighbours_oh).squeeze()
@@ -61,6 +70,9 @@ class GreedyValueSolver(Solver):
             TT.end_profile()
 
         return None, None
+
+    def __str__(self) -> str:
+        return "Greedy Value"
 
 class AStar(Solver):
 
@@ -176,3 +188,6 @@ class AStar(Solver):
                 preds += model(states_oh).squeeze()
 
         return (self.l * preds / len(self.models)).cpu()
+
+    def __str__(self) -> str:
+        return f"A*$(\lambda={self.l}, N={self.N})$"
