@@ -2,6 +2,7 @@ import os
 from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 import pelutils.ds.plots as plots
 from pelutils import log
@@ -9,10 +10,12 @@ from pelutils import log
 from deepspeedcube.eval.eval import EvalConfig, EvalResults
 
 
+
 def plot_solve_pct(loc: str, cfg: EvalConfig, res: EvalResults):
     solved_frac = np.array(res.solved) / cfg.states_per_depth
 
     with plots.Figure(f"{loc}/plots-eval/solve-pct.png"):
+        plt.figure().gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
         plt.plot(100 * solved_frac, "--o")
         plt.title("Solve pct. for %s" % cfg.solver_name)
         plt.xlabel("Scrambles")
@@ -21,6 +24,7 @@ def plot_solve_pct(loc: str, cfg: EvalConfig, res: EvalResults):
 
 def plot_solve_pct_all(loc: str, evals: list[str], cfgs: list[EvalConfig], ress: list[EvalResults]):
     with plots.Figure(f"{loc}/plots-eval/solve-pct.png"):
+        plt.figure().gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
         for eval, cfg, res in zip(evals, cfgs, ress):
             solved_frac = np.array(res.solved) / cfg.states_per_depth
             plt.plot(100 * solved_frac, "--o", label=cfg.solver_name)

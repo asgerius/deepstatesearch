@@ -26,6 +26,7 @@ struct node {
 };
 
 struct astar_search {
+    float lambda;
     size_t longest_path;  // Longest path from the initial node to any node
     size_t state_size;
     struct hashmap *node_map;
@@ -36,6 +37,7 @@ typedef struct node node;
 typedef struct astar_search astar_search;
 
 astar_search *astar_init(
+    float lambda,
     size_t state_size,
     heap *frontier
 );

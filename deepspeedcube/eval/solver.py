@@ -100,6 +100,7 @@ class AStar(Solver):
         frontier = MinHeap(state.size(), state.dtype)
 
         search_state_p = ctypes.c_void_p(LIBDSC.astar_init(
+            ctypes.c_float(self.l),
             ctypes.c_size_t(tensor_size(state)),
             frontier._heap_ptr,
         ))
@@ -181,13 +182,17 @@ class AStar(Solver):
             states_d = states.to(device)
         with TT.profile("One-hot"):
             states_oh = self.env.multiple_oh(states_d)
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
 
         preds = torch.zeros(len(states), dtype=torch.float, device=device)
         with TT.profile("Estimate cost-to-go"):
             for model in self.models:
                 preds += model(states_oh).squeeze()
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
 
-        return (self.l * preds / len(self.models)).cpu()
+        return preds.cpu() / len(self.models)
 
     def __str__(self) -> str:
-        return f"A*$(\lambda={self.l}, N={self.N})$"
+        return f"$A^*(\lambda={self.l}, N={self.N})$"

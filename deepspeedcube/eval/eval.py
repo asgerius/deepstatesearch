@@ -119,6 +119,12 @@ def eval(job: JobDescription):
                         raise RuntimeError("Failed to solve state")
                     TT.end_profile()
 
+        log("Solved %i / %i = %.0f %%" % (
+            results.solved[-1],
+            eval_cfg.states_per_depth,
+            100 * results.solved[-1] / eval_cfg.states_per_depth,
+        ))
+
         TT.end_profile()
 
     log.section("Saving")

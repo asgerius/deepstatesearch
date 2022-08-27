@@ -37,10 +37,12 @@ void free_node(void *elem) {
 }
 
 astar_search *astar_init(
+    float lambda,
     size_t state_size,
     heap *frontier
 ) {
     astar_search *search = malloc(sizeof(astar_search));
+    search->lambda = lambda;
     search->longest_path = 0;
     search->state_size = state_size;
     search->frontier = frontier;
@@ -110,14 +112,14 @@ size_t astar_insert_neighbours(
 
             if (neighbour_node != NULL && g_tentative < neighbour_node->g) {
                 // Node has been seen before and has shorter path to it
-                neighbour_node->f = g_tentative + h[neighbour_index];
+                neighbour_node->f = search->lambda * g_tentative + h[neighbour_index];
                 neighbour_node->g = g_tentative;
                 neighbour_node->arrival_action = j;
             } else if (neighbour_node == NULL) {
                 // Node has not been seen before, so add to node map and frontier
                 node *new_node_p = init_node(
                     j,
-                    g_tentative + h[neighbour_index],
+                    search->lambda * g_tentative + h[neighbour_index],
                     g_tentative,
                     search->state_size,
                     neighbour
