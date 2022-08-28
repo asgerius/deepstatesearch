@@ -43,6 +43,8 @@ void bubble_up(heap *heap, size_t index) {
         memcpy(data_node,   data_parent, heap->element_size);
         memcpy(data_parent, data_tmp,    heap->element_size);
 
+        free(data_tmp);
+
         bubble_up(heap, index_parent);
     }
 }
@@ -89,6 +91,8 @@ void bubble_down(heap *heap, size_t index) {
         memcpy(data_tmp,   data_node,  heap->element_size);
         memcpy(data_node,  data_child, heap->element_size);
         memcpy(data_child, data_tmp,   heap->element_size);
+
+        free(data_tmp);
 
         bubble_down(heap, index_child);
     }
