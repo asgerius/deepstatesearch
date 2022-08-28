@@ -12,7 +12,7 @@ from deepspeedcube.eval.eval import EvalConfig, EvalResults
 
 
 def plot_solve_pct(loc: str, cfg: EvalConfig, res: EvalResults):
-    solved_frac = np.array(res.solved) / cfg.states_per_depth
+    solved_frac = np.array(res.solved).mean(axis=1)
 
     with plots.Figure(f"{loc}/plots-eval/solve-pct.png"):
         plt.figure().gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
@@ -20,18 +20,36 @@ def plot_solve_pct(loc: str, cfg: EvalConfig, res: EvalResults):
         plt.title("Solve pct. for %s" % cfg.solver_name)
         plt.xlabel("Scrambles")
         plt.ylabel("Solved [%]")
+        plt.ylim([-7, 107])
         plt.grid()
 
-def plot_solve_pct_all(loc: str, evals: list[str], cfgs: list[EvalConfig], ress: list[EvalResults]):
+def plot_solve_pct_all(loc: str, cfgs: list[EvalConfig], ress: list[EvalResults]):
     with plots.Figure(f"{loc}/plots-eval/solve-pct.png"):
         plt.figure().gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-        for eval, cfg, res in zip(evals, cfgs, ress):
-            solved_frac = np.array(res.solved) / cfg.states_per_depth
+        for cfg, res in zip(cfgs, ress):
+            solved_frac = np.array(res.solved).mean(axis=1)
             plt.plot(100 * solved_frac, "--o", label=cfg.solver_name)
+        plt.legend()
         plt.xlabel("Scrambles")
         plt.ylabel("Solved [%]")
+        plt.ylim([-7, 107])
         plt.grid()
-        plt.legend()
+
+def plot_solve_rate_time(loc: str, cfg: EvalConfig, res: EvalResults):
+    with plots.Figure(f"{loc}/plots-eval/solve-rate-time.png"):
+        solved = np.array(res.solved)[-1]
+        solve_times = np.array(res.solve_times)[-1, solved]
+        solve_times = np.sort(solve_times)
+        solved_frac = np.linspace(0, solved.mean(), 1 + len(solve_times))[1:]
+
+        if solved.any():
+            plt.plot(solve_times, 100 * solved_frac, "--o")
+
+            plt.xlabel("Wall time [s]")
+            plt.ylabel("Solved states [%]")
+            plt.xlim([-0.07 * solve_times.max(), 1.07 * solve_times.max()])
+            plt.ylim([-7, 107])
+            plt.grid()
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -54,6 +72,7 @@ if __name__ == "__main__":
         results.append(res)
 
         plot_solve_pct(loc, cfg, res)
+        plot_solve_rate_time(loc, cfg, res)
 
     log("Plotting combined")
-    plot_solve_pct_all(args.location, args.evals, configs, results)
+    plot_solve_pct_all(args.location, configs, results)
