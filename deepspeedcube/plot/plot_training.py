@@ -14,6 +14,7 @@ def plot_loss(loc: str, cfg: TrainConfig, res: TrainResults):
         mean_loss = losses.mean(axis=0)
         plt.plot(mean_loss, c=plots.tab_colours[0])
         plt.plot(losses.T, alpha=0.5, c=plots.tab_colours[0])
+        plt.xscale("log")
         plt.grid()
         plt.xlabel("Batch")
         plt.ylabel("MSE loss")

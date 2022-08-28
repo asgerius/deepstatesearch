@@ -27,7 +27,6 @@ class TrainConfig(DataStorage, json_name="train_config.json", indent=4):
     lr:              float
     tau:             float
     tau_every:       int
-    j_norm:          float
     weight_decay:    float
     max_update_loss: float
 
@@ -54,7 +53,6 @@ def train(job: JobDescription):
         lr              = job.lr,
         tau             = job.tau,
         tau_every       = job.tau_every,
-        j_norm          = job.j_norm,
         weight_decay    = job.weight_decay,
         max_update_loss = job.max_update_loss,
     )
@@ -75,6 +73,7 @@ def train(job: JobDescription):
         num_residual_blocks = job.num_residual_blocks,
         residual_size       = job.residual_size,
         dropout             = job.dropout,
+        j_norm              = job.j_norm,
     )
     log("Got model config", model_cfg)
 
@@ -126,7 +125,7 @@ def train(job: JobDescription):
                 preds = torch.zeros(len(states_d), device=device)
                 for model in models:
                     preds += model(states_oh).squeeze()
-                preds = train_cfg.j_norm * preds / len(models)
+                preds = preds / len(models)
 
                 for j in range(train_cfg.scramble_depth):
                     train_results.value_estimations[j].append(

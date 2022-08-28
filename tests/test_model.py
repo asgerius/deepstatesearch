@@ -5,7 +5,7 @@ from deepspeedcube.model.generator_network import update_generator_network, clon
 
 
 def test_update_generator():
-    model_cfg = ModelConfig(100, [100, 100], 2, 50, 0)
+    model_cfg = ModelConfig(100, [100, 100], 2, 50, 0, 2)
     for tau in torch.linspace(0, 1, 5):
         model = Model(model_cfg)
         gen_model = Model(model_cfg)
@@ -17,7 +17,7 @@ def test_update_generator():
         assert torch.all(torch.isclose(gen_model.all_params(), new_gen_params))
 
 def test_clone_model():
-    model_cfg = ModelConfig(100, [100, 100], 2, 50, 0)
+    model_cfg = ModelConfig(100, [100, 100], 2, 50, 0, 2)
     model = Model(model_cfg)
     model2 = Model(model_cfg)
     assert not torch.all(torch.isclose(model.all_params(), model2.all_params()))

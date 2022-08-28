@@ -15,6 +15,7 @@ class ModelConfig(DataStorage, json_name="model_config.json", indent=4):
     num_residual_blocks: int
     residual_size:       int
     dropout:             float
+    j_norm:              float
 
 class _BaseModel(abc.ABC, nn.Module):
     def __init__(self, cfg: ModelConfig):
@@ -71,7 +72,7 @@ class Model(_BaseModel):
         x = self.fully_connected(x)
         x = self.residual_blocks(x)
         x = self.output_layer(x)
-        return x
+        return self.cfg.j_norm * x
 
 class _ResidualBlock(_BaseModel):
 
