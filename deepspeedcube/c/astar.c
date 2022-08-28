@@ -103,13 +103,14 @@ size_t astar_insert_neighbours(
 
         tmp_node.state = current;
         node *current_node = hashmap_get(search->node_map, &tmp_node);
+        size_t g_current = current_node->g;
 
         #pragma unroll
         for (j = 0; j < neighbours_per_state; ++ j) {
             size_t neighbour_index = i * neighbours_per_state + j;
             void *neighbour = neighbour_states + neighbour_index * search->state_size;
 
-            size_t g_tentative = current_node->g + 1;
+            size_t g_tentative = g_current + 1;
             tmp_node.state = neighbour;
             node *neighbour_node = hashmap_get(search->node_map, &tmp_node);
 
