@@ -24,7 +24,7 @@ lib/libdsc.so:
 	$(CC) -o $@ \
 		deepspeedcube/c/hashmap.c/hashmap.c \
 		deepspeedcube/c/astar.c deepspeedcube/c/heap.c deepspeedcube/c/unique.c \
-		deepspeedcube/c/envs/envs.c deepspeedcube/c/envs/cube.c \
+		deepspeedcube/c/envs/envs.c deepspeedcube/c/envs/cube.c deepspeedcube/c/envs/sliding.c \
 		$(CFLAGS) $(CSHARED)
 
 lib/cube_cuda.so:

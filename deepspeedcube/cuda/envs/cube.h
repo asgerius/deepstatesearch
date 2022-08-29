@@ -5,7 +5,7 @@
 #define FACES_PER_THREAD 4
 
 typedef char face;
-typedef char action;
+typedef unsigned char action;
 
 extern "C" void multi_act(
     char *maps_d,

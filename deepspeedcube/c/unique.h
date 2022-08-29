@@ -1,5 +1,5 @@
-#ifndef UNIQUEH
-#define UNIQUEH
+#ifndef UNIQUE_H
+#define UNIQUE_H
 
 #include <stdlib.h>
 #include <string.h>

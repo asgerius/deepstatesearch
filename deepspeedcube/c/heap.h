@@ -1,5 +1,5 @@
-#ifndef HEAPH
-#define HEAPH
+#ifndef HEAP_H
+#define HEAP_H
 
 #include <stdlib.h>
 #include <string.h>

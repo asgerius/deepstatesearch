@@ -1,5 +1,5 @@
-#ifndef ASTARH
-#define ASTARH
+#ifndef ASTAR_H
+#define ASTAR_H
 
 #include <limits.h>
 #include <math.h>
@@ -7,6 +7,7 @@
 #include <string.h>
 #include "heap.h"
 
+#include "envs/envs.h"
 #include "envs/cube.h"
 #include "hashmap.c/hashmap.h"
 
@@ -14,8 +15,6 @@
 
 #define MAX(x, y) (((x) >= (y)) * (x) + ((x) < (y)) * (y))
 
-
-typedef char action;
 
 struct node {
     action arrival_action;  // The action taken to get to this state
