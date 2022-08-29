@@ -51,6 +51,20 @@ def plot_solve_rate_time(loc: str, cfg: EvalConfig, res: EvalResults):
             plt.ylim([-7, 107])
             plt.grid()
 
+def plot_states_seen(loc: str, cfg: EvalConfig, res: EvalResults):
+    with plots.Figure(f"{loc}/plots-eval/states-seen.png"):
+        solved = np.array(res.solved[-1])
+        solve_times = np.array(res.solve_times)[-1]
+        states_seen = np.array(res.states_seen)[-1]
+
+        for did_solve in True, False:
+            plt.scatter(solve_times[solved==did_solve], states_seen[solved==did_solve], label="Solved" if did_solve else "Not solved")
+
+        plt.legend()
+        plt.xlabel("Wall time [s]")
+        plt.ylabel("States seen")
+        plt.grid()
+
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("location")
@@ -61,9 +75,9 @@ if __name__ == "__main__":
 
     configs = list()
     results = list()
-    for eval in args.evals:
-        log("Plotting %s" % eval)
-        loc = f"{args.location}/{eval}"
+    for eval_ in args.evals:
+        log("Plotting %s" % eval_)
+        loc = f"{args.location}/{eval_}"
         os.makedirs(f"{loc}/plots-eval", exist_ok=True)
 
         cfg = EvalConfig.load(loc)
@@ -73,6 +87,7 @@ if __name__ == "__main__":
 
         plot_solve_pct(loc, cfg, res)
         plot_solve_rate_time(loc, cfg, res)
+        plot_states_seen(loc, cfg, res)
 
     log("Plotting combined")
     plot_solve_pct_all(args.location, configs, results)
