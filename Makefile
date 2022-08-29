@@ -1,5 +1,5 @@
 CC      = gcc
-CFLAGS  = -g0 -O3 -funroll-loops -fopenmp -ffast-math
+CFLAGS  = -g0 -O3 -funroll-loops -fopenmp -ffast-math -funsigned-char
 CSHARED = -shared -fPIC
 
 CPP     = g++

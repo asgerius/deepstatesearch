@@ -100,8 +100,7 @@ void bubble_down(heap *heap, size_t index) {
 
 void heap_extract_min(heap *heap, size_t n, float *keys, void *data) {
 
-    size_t i;
-    for (i = 0; i < n; ++ i) {
+    for (size_t i = 0; i < n; ++ i) {
         keys[i] = heap->keys[1];
         heap->keys[1] = heap->keys[heap->num_elems];
 
@@ -126,8 +125,7 @@ void heap_extract_min(heap *heap, size_t n, float *keys, void *data) {
 
 void heap_insert(heap *heap, size_t n, float *keys, const void *data) {
 
-    size_t i;
-    for (i = 0; i < n; ++ i) {
+    for (size_t i = 0; i < n; ++ i) {
         ++ heap->num_elems;
         heap->keys[heap->num_elems] = keys[i];
         memcpy(

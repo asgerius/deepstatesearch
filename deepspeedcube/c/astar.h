@@ -13,8 +13,6 @@
 
 #define NULL_ACTION (action)UCHAR_MAX
 
-#define MAX(x, y) (((x) >= (y)) * (x) + ((x) < (y)) * (y))
-
 
 struct node {
     action arrival_action;  // The action taken to get to this state
