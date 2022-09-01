@@ -23,8 +23,8 @@ class EvalConfig(DataStorage, json_name="eval_cfg.json", indent=4):
     astar_lambda:     float
     astar_n:          int
     astar_d:          int
-    validate:         bool
     solver_name:      str
+    validate:         bool
 
 @dataclass
 class EvalResults(DataStorage, json_name="eval_results.json", indent=4):
@@ -39,7 +39,7 @@ def eval(job: JobDescription):
     log.section("Loading configurations")
     eval_cfg = EvalConfig(
         solver           = job.solver,
-        depths           = list(range(job.max_depth+1)),
+        depths           = list(range(job.max_depth+1)) if job.range else [job.max_depth],
         states_per_depth = job.states_per_depth,
         max_time         = job.max_time,
         astar_lambda     = job.astar_lambda,
@@ -111,7 +111,8 @@ def eval(job: JobDescription):
 
         TT.profile("Evaluate at depth %i" % depth)
 
-        for state in states[i]:
+        for j, state in enumerate(states[i]):
+            log.debug("State %i / %i" % (j + 1, eval_cfg.states_per_depth))
             actions, time, states_seen = solver.solve(state)
             did_solve = actions is not None
             results.num_solved[-1] += did_solve
@@ -119,6 +120,8 @@ def eval(job: JobDescription):
             results.solve_times[-1].append(time)
             results.states_seen[-1].append(states_seen)
             results.solve_lengths[-1].append(len(actions) if did_solve else -1)
+
+            log.debug("Solved: %s" % did_solve, "Time: %.4f s" % time)
 
             if did_solve and eval_cfg.validate:
                 TT.profile("Validate")

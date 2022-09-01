@@ -16,7 +16,7 @@ def plot_solve_pct(loc: str, cfg: EvalConfig, res: EvalResults):
 
     with plots.Figure(f"{loc}/plots-eval/solve-pct.png"):
         plt.figure().gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-        plt.plot(100 * solved_frac, "--o")
+        plt.plot(cfg.depths, 100 * solved_frac, "--o")
         plt.title("Solve pct. for %s" % cfg.solver_name)
         plt.xlabel("Scrambles")
         plt.ylabel("Solved [%]")
@@ -28,7 +28,7 @@ def plot_solve_pct_all(loc: str, cfgs: list[EvalConfig], ress: list[EvalResults]
         plt.figure().gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
         for cfg, res in zip(cfgs, ress):
             solved_frac = np.array(res.solved).mean(axis=1)
-            plt.plot(100 * solved_frac, "--o", label=cfg.solver_name)
+            plt.plot(cfg.depths, 100 * solved_frac, "--o", label=cfg.solver_name)
         plt.legend()
         plt.xlabel("Scrambles")
         plt.ylabel("Solved [%]")

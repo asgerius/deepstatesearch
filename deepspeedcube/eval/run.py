@@ -16,6 +16,7 @@ options = (
     Option("astar-n",          default=100),
     Option("astar-d",          default=1),
     Flag("validate"),
+    Flag("range"),
 )
 
 if __name__ == "__main__":
