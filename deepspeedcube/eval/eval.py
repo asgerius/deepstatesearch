@@ -121,7 +121,12 @@ def eval(job: JobDescription):
             results.states_seen[-1].append(states_seen)
             results.solve_lengths[-1].append(len(actions) if did_solve else -1)
 
-            log.debug("Solved: %s" % did_solve, "Time: %.4f s" % time)
+            log.debug(
+                "Solved: %s" % did_solve,
+                "Time:   %.4f s" % time,
+                "States: %s" % thousands_seperators(states_seen),
+                "States per second: %.0f" % (states_seen / time),
+            )
 
             if did_solve and eval_cfg.validate:
                 TT.profile("Validate")
