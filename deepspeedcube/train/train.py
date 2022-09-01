@@ -61,7 +61,7 @@ def train(job: JobDescription):
     log("Setting up environment '%s'" % train_cfg.env)
     env = get_env(train_cfg.env)
 
-    eval_batches = np.arange(0, train_cfg.batches, 500, dtype=int).tolist()
+    eval_batches = np.arange(0, train_cfg.batches, 1000, dtype=int).tolist()
     if (last_batch_idx := train_cfg.batches - 1) != eval_batches[-1]:
         eval_batches.append(last_batch_idx)
     log("Evaluating at batches", eval_batches)
@@ -89,7 +89,7 @@ def train(job: JobDescription):
         gen_model.eval()
         clone_model(model, gen_model)
         optimizer = optim.AdamW(model.parameters(), lr=train_cfg.lr, weight_decay=train_cfg.weight_decay)
-        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=20000)
+        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=train_cfg.batches)
         models.append(model)
         gen_models.append(gen_model)
         optimizers.append(optimizer)
