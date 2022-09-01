@@ -202,8 +202,86 @@ class _CubeEnvironment(Environment):
     def string(cls, state: torch.Tensor) -> str:
         return cls._stringify_cube(cls._as633(state.cpu()))
 
+class _SlidingPuzzle(Environment):
+
+    size: ctypes.c_short
+    dtype = torch.int16
+    action_space = torch.arange(4, dtype=dtype)
+
+    @classmethod
+    def move(cls, action: int, state: torch.Tensor) -> torch.Tensor:
+        new_state = state.clone()
+        action = torch.Tensor([action]).to(cls.dtype)
+
+        LIBDSC.sliding_multi_act(
+            ptr(new_state),
+            ptr(action),
+            1,
+            cls.size,
+        )
+
+        return new_state
+
+    @classmethod
+    def multiple_moves(cls, actions: torch.Tensor, states: torch.Tensor, inplace=False) -> torch.Tensor:
+        states = states if inplace else states.clone()
+
+        LIBDSC.sliding_multi_act(
+            ptr(states),
+            ptr(actions),
+            len(actions),
+            cls.size,
+        )
+
+        return states
+
+    @classmethod
+    def oh(cls, state: torch.Tensor) -> torch.Tensor:
+        return F.one_hot(
+            state[2:].long(),
+            num_classes=cls.state_oh_size // len(cls._solved_state[2:]),
+        ).astype(torch.float32).view(1, -1)
+
+    @classmethod
+    def multiple_oh(cls, states: torch.Tensor) -> torch.Tensor:
+        return F.one_hot(
+            states[2:].long(),
+            num_classes=cls.state_oh_size // len(cls._solved_state[2:]),
+        ).to(torch.float32).view(len(states), -1)
+
+    @classmethod
+    def reverse_move(cls, action: int) -> int:
+        return (action % 4 + 2) % 2
+
+    @classmethod
+    def reverse_moves(cls, actions: torch.Tensor) -> torch.Tensor:
+        return (actions % 4 + 2) % 2
+
+    @classmethod
+    def string(cls, state: torch.Tensor) -> str:
+        size = cls.size.value
+        readable_state = np.empty((size, size), dtype=int)
+        for i in range(size ** 2):
+            row = i // size
+            col = i % size
+            readable_state[row, col] = state[i+2]
+        return str(readable_state)
+
+class _SlidingPuzzle15(_SlidingPuzzle):
+
+    size = ctypes.c_short(15)
+
+    state_shape = torch.Size([2 + 15 ** 2])
+    state_oh_size = 15 ** 2
+    _solved_state = torch.concat((
+        torch.tensor([0, 0]), torch.arange(15 ** 2)
+    )).to(_SlidingPuzzle.dtype)
+    state_size = tensor_size(_solved_state)
+
+
 _ENVS = {
     "cube": _CubeEnvironment,
+    "sp15": _SlidingPuzzle15,
 }
 
 def get_env(env: str) -> Type[Environment]:

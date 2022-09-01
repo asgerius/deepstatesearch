@@ -7,9 +7,10 @@ local_*
 .python-version
 out/
 configs/
-benchmark-results/
+benchmark-results*/
 job.sh
 jobs/
+*.png
 
 # Latex
 *.aux
