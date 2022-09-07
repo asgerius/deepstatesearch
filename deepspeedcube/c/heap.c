@@ -1,5 +1,5 @@
 #include "heap.h"
-#include <stdio.h>
+
 
 heap *heap_alloc(size_t element_size) {
     heap *heap_p = malloc(sizeof(*heap_p));
@@ -30,21 +30,12 @@ void heap_free(heap *heap_p) {
 }
 
 int heap_should_increase_alloc(heap *heap_p, size_t new_elems) {
-    // printf("Increase alloc with %zu + %zu > %zu?\n", heap_p->num_elems, new_elems, heap_p->num_alloc);
     return heap_p->num_elems + new_elems > heap_p->num_alloc;
 }
 
 void heap_increase_alloc(heap *heap_p) {
-    // printf("Doubling allocation\n");
 
     // Create new array for entries
-
-    // for (size_t i = 0; i < heap_p->num_data_arrays; ++ i) {
-    //     printf("Data pointer %zu = %p\n", i, heap_p->data[i]);
-    // }
-    // for (size_t i = 0; i < heap_p->num_alloc; ++ i) {
-    //     printf("Entry %zu = %p\n", i, heap_p->entries[i].data);
-    // }
     heap_entry *new_entry_array = malloc(2 * heap_p->num_alloc * sizeof(heap_entry));
     memcpy(
         new_entry_array,
@@ -58,32 +49,16 @@ void heap_increase_alloc(heap *heap_p) {
     free(heap_p->entries);
     heap_p->entries = new_entry_array;
 
-    // for (size_t i = 0; i < heap_p->num_data_arrays; ++ i) {
-    //     printf("Data pointer %zu = %p\n", i, heap_p->data[i]);
-    // }
-    // for (size_t i = 0; i < heap_p->num_alloc; ++ i) {
-    //     printf("Entry %zu = %p\n", i, new_entry_array[i].data);
-    // }
-
-    // printf("Creating new data array\n");
-
     // Create new data array
     void **new_data_arrays = malloc((heap_p->num_data_arrays + 1) * sizeof(void *));
-    // printf("Copying %zu bytes to new data array\n", heap_p->num_data_arrays * sizeof(void *));
     for (size_t i = 0; i < heap_p->num_data_arrays; ++ i) {
-        // printf("Copying data pointer at %p\n", heap_p->data[i]);
         new_data_arrays[i] = heap_p->data[i];
     }
     free(heap_p->data);
     heap_p->data = new_data_arrays;
-    // printf("Set new data arrays\n");
     void *new_data = malloc(heap_p->num_alloc * heap_p->element_size);
     heap_p->data[heap_p->num_data_arrays] = new_data;
     heap_p->entries[heap_p->num_alloc].data = new_data;
-
-    // for (size_t i = 0; i < heap_p->num_data_arrays + 1; ++ i) {
-    //     printf("Pointer %zu = %p\n", i, heap_p->data[i]);
-    // }
 
     // Set pointers in the new entries to the new array
     #pragma omp parallel for
@@ -93,13 +68,6 @@ void heap_increase_alloc(heap *heap_p) {
 
     heap_p->num_alloc *= 2;
     ++ heap_p->num_data_arrays;
-
-    // for (size_t i = 0; i < heap_p->num_data_arrays; ++ i) {
-    //     printf("Data pointer %zu = %p\n", i, heap_p->data[i]);
-    // }
-    // for (size_t i = 0; i < heap_p->num_alloc; ++ i) {
-    //     printf("Entry %zu = %p\n", i, heap_p->entries[i].data);
-    // }
 }
 
 void bubble_up(heap *heap_p, size_t index) {
@@ -181,7 +149,6 @@ size_t heap_extract_min(heap *heap_p, size_t n, float *keys, void *data) {
 
         bubble_down(heap_p, 1);
     }
-    // printf("%zu after extract\n", heap_p->num_elems);
 
     return n;
 }
@@ -190,26 +157,14 @@ void heap_insert(heap *heap_p, size_t n, const float *keys, const void *data) {
     /* Insert n elements into the heap. This function assumes that enough data has
     been allocated to the heap, which can be checked with heap_should_increase_alloc.
     If not, use heap_increase_alloc to double the amount of available memory. */
-    // printf("Inserting into heap\n");
-    // printf("Current = %zu, alloc = %zu, new = %zu\n", heap_p->num_elems, heap_p->num_alloc, n);
-
-    // for (size_t i = 0; i < heap_p->num_data_arrays; ++ i) {
-    //     printf("Data pointer %zu = %p\n", i, heap_p->data[i]);
-    // }
-    // for (size_t i = 0; i < 2 * heap_p->num_elems; ++ i) {
-    //     printf("Data at entry %zu = %p\n", i, heap_p->entries[i].data);
-    // }
 
     for (size_t i = 0; i < n; ++ i) {
         heap_p->entries[heap_p->num_elems].key = keys[i];
-        // printf("Got key %f\n", heap_p->entries[heap_p->num_elems].key);
-        // printf("Inserting data into %p\n", heap_p->entries[heap_p->num_elems].data);
         memcpy(
             heap_p->entries[heap_p->num_elems].data,
             data + i * heap_p->element_size,
             heap_p->element_size
         );
-        // printf("Set data at new entry\n");
 
         bubble_up(heap_p, heap_p->num_elems);
 
