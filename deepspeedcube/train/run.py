@@ -22,7 +22,7 @@ options = (
     Option("residual-size",       default=1024),
     Option("dropout",             default=0, type=float),
     Option("weight-decay",        default=0, type=float),
-    Option("max-update-loss",     default=1e6, type=float),
+    Option("epsilon",             default=1e6, type=float),
 )
 
 if __name__ == "__main__":

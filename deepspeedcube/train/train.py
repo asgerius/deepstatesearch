@@ -28,7 +28,7 @@ class TrainConfig(DataStorage, json_name="train_config.json", indent=4):
     tau:             float
     tau_every:       int
     weight_decay:    float
-    max_update_loss: float
+    epsilon:         float
 
 @dataclass
 class TrainResults(DataStorage, json_name="train_results.json", indent=4):
@@ -54,7 +54,7 @@ def train(job: JobDescription):
         tau             = job.tau,
         tau_every       = job.tau_every,
         weight_decay    = job.weight_decay,
-        max_update_loss = job.max_update_loss,
+        epsilon = job.epsilon,
     )
     log("Got training config", train_cfg)
 
@@ -248,7 +248,7 @@ def train(job: JobDescription):
 
             scheduler.step()
 
-            if i % train_cfg.tau_every == 0 and train_results.losses[j][-1] < train_cfg.max_update_loss:
+            if i % train_cfg.tau_every == 0 and train_results.losses[j][-1] < train_cfg.epsilon:
                 log.debug("Updating generator network")
                 with TT.profile("Update generator network"):
                     update_generator_network(train_cfg.tau, gen_models[j], models[j])
