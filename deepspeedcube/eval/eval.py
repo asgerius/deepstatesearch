@@ -125,7 +125,7 @@ def eval(job: JobDescription):
                 "Solved: %s" % did_solve,
                 "Time:   %.4f s" % time,
                 "States: %s" % thousands_seperators(states_seen),
-                "States per second: %.0f" % (states_seen / time),
+                "States per second: %s" % thousands_seperators(round(states_seen / time)),
             )
 
             if did_solve and eval_cfg.validate:

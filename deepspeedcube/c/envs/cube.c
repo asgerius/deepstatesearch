@@ -34,8 +34,7 @@ const char smaps[12][24] = {  // Sides
 void cube_multi_act(face *states, action *actions, size_t n) {
     // Performs n actions on n states in-place
     #pragma omp parallel for
-    for (size_t i = 0; i < n; i ++) {
-        // printf("%d\n", omp_get_thread_num());
+    for (size_t i = 0; i < n; ++ i) {
         // Row pointer for easy indexing
         face *restrict p_state = states + 20 * i;
         // Slightly faster by only looking up maps once
