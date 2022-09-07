@@ -35,12 +35,13 @@ typedef struct astar_search astar_search;
 
 astar_search *astar_init(
     float lambda,
-    size_t state_size,
-    heap *frontier
+    size_t state_size
 );
 
 /* Frees all allocated memory and returns number of states in the node map. */
 size_t astar_free(astar_search *search);
+
+void *astar_frontier_ptr(astar_search *search);
 
 void astar_add_initial_state(
     float h,
@@ -49,9 +50,8 @@ void astar_add_initial_state(
 );
 
 /* A* iteration step. A lot of the nomenclature follows the pseudocode on
-https://en.wikipedia.org/wiki/A*_search_algorithm. It returns the size of
-the frontier (including the null element). */
-size_t astar_insert_neighbours(
+https://en.wikipedia.org/wiki/A*_search_algorithm. */
+void astar_insert_neighbours(
     size_t num_current_states,  // 1 until batched A* is implemented
     void *current_states,
     size_t num_neighbour_states,

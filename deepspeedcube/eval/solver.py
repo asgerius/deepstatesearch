@@ -101,34 +101,39 @@ class AStar(Solver):
 
         TT.profile("A*")
 
-        frontier = MinHeap(state.size(), state.dtype)
-
         search_state_p = ctypes.c_void_p(LIBDSC.astar_init(
             ctypes.c_float(self.l),
-            ctypes.c_size_t(tensor_size(state)),
-            frontier._heap_ptr,
+            ctypes.c_size_t(tensor_size(state))
         ))
+        frontier_p = ctypes.c_void_p(LIBDSC.astar_frontier_ptr(search_state_p))
+        print("Got search state at 0x%x" % search_state_p.value)
+        print("Frontier at 0x%x" % frontier_p.value)
 
         # Insert initial state into frontier and node map
         h = self.h(state.unsqueeze(0))[0].item()
 
         LIBDSC.astar_add_initial_state(h, ptr(state), search_state_p)
-        frontier.insert(h, state)
+        print("Added initial state")
 
         solved = False
 
         while self.tt.tock() < self.max_time:
+            # print()
+            # print("#########################")
+            # print()
+
             TT.profile("Iteration")
 
-            with TT.profile("Extract from frontier"):
-                _, current_states = frontier.extract_min_multiple(self.N)
+            _, current_states = self.extract_min(frontier_p)
+            # print("Extracted min")
             neighbour_states = self.env.neighbours(current_states)
+            # print(neighbour_states.shape)
 
             # Make sure there is enough space in the heap, as astar_insert_neighbours
             # usually adds new states without allocating more memory
-            while frontier._num_elems + len(neighbour_states) > len(frontier._keys):
+            while LIBDSC.heap_should_increase_alloc(frontier_p, ctypes.c_size_t(len(neighbour_states))):
                 with TT.profile("Expand frontier"):
-                    frontier._expand_heap()
+                    LIBDSC.heap_increase_alloc(frontier_p)
 
             if self.env.multiple_is_solved(neighbour_states).any():
                 longest_path = LIBDSC.astar_longest_path(search_state_p) + 1
@@ -143,7 +148,7 @@ class AStar(Solver):
             h = self.h(neighbour_states)
 
             with TT.profile("Update search state"):
-                frontier._num_elems = LIBDSC.astar_insert_neighbours(
+                LIBDSC.astar_insert_neighbours(
                     ctypes.c_size_t(len(current_states)),
                     ptr(current_states),
                     ctypes.c_size_t(len(neighbour_states)),
@@ -170,6 +175,7 @@ class AStar(Solver):
                 actions = actions[:num_actions].flip(0)
 
         states_seen = LIBDSC.astar_free(search_state_p)
+        print(states_seen)
 
         TT.end_profile()
 
@@ -177,6 +183,13 @@ class AStar(Solver):
             return actions, self.tt.tock(), states_seen
 
         return None, self.tt.tock(), states_seen
+
+    def extract_min(self, frontier_p: ctypes.c_void_p) -> torch.Tensor:
+        with TT.profile("Extract from frontier"):
+            keys_arr = torch.empty((self.N, ), dtype=torch.float)
+            data_arr = torch.empty((self.N, *self.env.state_shape), dtype=self.env.dtype)
+            num_extracted = LIBDSC.heap_extract_min(frontier_p, self.N, ptr(keys_arr), ptr(data_arr))
+            return keys_arr[:num_extracted], data_arr[:num_extracted]
 
     @torch.no_grad()
     def h(self, states: torch.Tensor) -> torch.Tensor:

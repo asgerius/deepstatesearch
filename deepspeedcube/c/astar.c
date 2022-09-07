@@ -38,14 +38,13 @@ void free_node(void *elem) {
 
 astar_search *astar_init(
     float lambda,
-    size_t state_size,
-    heap *frontier
+    size_t state_size
 ) {
     astar_search *search = malloc(sizeof(astar_search));
     search->lambda = lambda;
     search->longest_path = 0;
     search->state_size = state_size;
-    search->frontier = frontier;
+    search->frontier = heap_alloc(state_size);
     search->node_map = hashmap_new(sizeof(node), 0, 0, 0, hash_node, compare_nodes, free_node, NULL);
 
     return search;
@@ -53,11 +52,14 @@ astar_search *astar_init(
 
 size_t astar_free(astar_search *search) {
     size_t num_states = hashmap_count(search->node_map);
-    // The frontier is not freed here, as it is owned and freed by
-    // the MinHeap structure in Python
     hashmap_free(search->node_map);
+    heap_free(search->frontier);
     free(search);
     return num_states;
+}
+
+void *astar_frontier_ptr(astar_search *search) {
+    return search->frontier;
 }
 
 void astar_add_initial_state(
@@ -70,9 +72,10 @@ void astar_add_initial_state(
     );
 
     hashmap_set(search->node_map, new_node_p);
+    heap_insert(search->frontier, 1, &h, state);
 }
 
-size_t astar_insert_neighbours(
+void astar_insert_neighbours(
     size_t num_current_states,
     void *current_states,
     size_t num_neighbour_states,
@@ -117,6 +120,9 @@ size_t astar_insert_neighbours(
                 neighbour_node->f = search->lambda * g_tentative + h[neighbour_index];
                 neighbour_node->g = g_tentative;
                 neighbour_node->arrival_action = j;
+                // if (neighbour_node in search->frontier) {
+                //     heap_decrease_key(search->frontier, , neighbour_node->g);
+                // }
             } else if (neighbour_node == NULL) {
                 // Node has not been seen before, so add to node map and frontier
                 node *new_node_p = init_node(
@@ -132,8 +138,6 @@ size_t astar_insert_neighbours(
             }
         }
     }
-
-    return search->frontier->num_elems + 1;
 }
 
 size_t astar_longest_path(astar_search *search) {
