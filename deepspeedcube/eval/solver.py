@@ -2,17 +2,13 @@ from __future__ import annotations
 
 import abc
 import ctypes
-import math
 import threading
 
-import numpy as np
-import psutil
 import torch
 from pelutils import TickTock, TT
 
 from deepspeedcube import device, LIBDSC, ptr, tensor_size
 from deepspeedcube.envs import Environment
-from deepspeedcube.min_heap import MinHeap
 from deepspeedcube.model import Model
 
 
