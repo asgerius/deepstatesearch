@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from pelutils import log, TT
 from pelutils.parser import Parser, Flag, Option
 
@@ -37,5 +39,6 @@ if __name__ == "__main__":
                 "GPU:     %s" % HardwareInfo.gpu,
                 sep="\n    ",
             )
+            log("OMP_NUM_THREADS = %s" % os.environ.get("OMP_NUM_THREADS"), with_info=False)
             eval(job)
             log.debug("Time distribution", TT)
