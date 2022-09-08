@@ -38,8 +38,8 @@ astar_search *astar_init(
     size_t state_size
 );
 
-/* Frees all allocated memory and returns number of states in the node map. */
-size_t astar_free(astar_search *search);
+/* Frees all allocated memory. */
+void astar_free(astar_search *search);
 
 void *astar_frontier_ptr(astar_search *search);
 
@@ -71,5 +71,7 @@ size_t astar_retrace_path(
     void (act)(void *state, void *action, size_t num_actions),
     astar_search *search
 );
+
+size_t astar_num_states(astar_search *search_state);
 
 #endif

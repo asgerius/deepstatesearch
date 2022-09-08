@@ -25,6 +25,7 @@ void heap_free(heap *heap_p) {
     for (size_t i = 0; i < heap_p->num_data_arrays; ++ i) {
         free(heap_p->data[i]);
     }
+    free(heap_p->data);
     free(heap_p->entries);
     free(heap_p);
 }
@@ -37,15 +38,10 @@ void heap_increase_alloc(heap *heap_p) {
 
     // Create new array for entries
     heap_entry *new_entry_array = malloc(2 * heap_p->num_alloc * sizeof(heap_entry));
-    memcpy(
-        new_entry_array,
-        heap_p->entries,
-        heap_p->num_alloc * sizeof(heap_entry)
-    );
-    // #pragma omp parallel for
-    // for (size_t i = 0; i < heap_p->num_elems; ++ i) {
-        // new_entry_array[i] = heap_p->entries[i];
-    // }
+    #pragma omp parallel for
+    for (size_t i = 0; i < heap_p->num_alloc; ++ i) {
+        new_entry_array[i] = heap_p->entries[i];
+    }
     free(heap_p->entries);
     heap_p->entries = new_entry_array;
 

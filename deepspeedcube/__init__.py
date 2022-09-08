@@ -16,10 +16,10 @@ LIBDSC = ctypes.cdll.LoadLibrary("lib/libdsc.so")
 
 LIBDSC.heap_extract_min.restype = ctypes.c_size_t
 LIBDSC.astar_init.restype = ctypes.c_void_p
-LIBDSC.astar_free.restype = ctypes.c_size_t
 LIBDSC.astar_frontier_ptr.restype = ctypes.c_void_p
 LIBDSC.astar_longest_path.restype = ctypes.c_size_t
 LIBDSC.astar_retrace_path.restype = ctypes.c_size_t
+LIBDSC.astar_num_states.restype = ctypes.c_size_t
 
 LIBDSC.astar_add_initial_state.argtypes = ctypes.c_float, ctypes.c_void_p, ctypes.c_void_p
 
