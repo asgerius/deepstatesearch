@@ -3,8 +3,10 @@ from __future__ import annotations
 import abc
 import ctypes
 import math
+import threading
 
 import numpy as np
+import psutil
 import torch
 from pelutils import TickTock, TT
 
@@ -101,16 +103,18 @@ class AStar(Solver):
 
         TT.profile("A*")
 
-        search_state_p = ctypes.c_void_p(LIBDSC.astar_init(
-            ctypes.c_float(self.l),
-            ctypes.c_size_t(tensor_size(state))
-        ))
-        frontier_p = ctypes.c_void_p(LIBDSC.astar_frontier_ptr(search_state_p))
+        with TT.profile("Allocate"):
+            search_state_p = ctypes.c_void_p(LIBDSC.astar_init(
+                ctypes.c_float(self.l),
+                ctypes.c_size_t(tensor_size(state))
+            ))
+            frontier_p = ctypes.c_void_p(LIBDSC.astar_frontier_ptr(search_state_p))
 
         # Insert initial state into frontier and node map
         h = self.h(state.unsqueeze(0))[0].item()
 
-        LIBDSC.astar_add_initial_state(h, ptr(state), search_state_p)
+        with TT.profile("Add initial state"):
+            LIBDSC.astar_add_initial_state(h, ptr(state), search_state_p)
 
         solved = False
 
@@ -119,7 +123,8 @@ class AStar(Solver):
             TT.profile("Iteration")
 
             _, current_states = self.extract_min(frontier_p)
-            neighbour_states = self.env.neighbours(current_states)
+            with TT.profile("Get neighbours"):
+                neighbour_states = self.env.neighbours(current_states)
 
             # Make sure there is enough space in the heap, as astar_insert_neighbours
             # usually adds new states without allocating more memory
@@ -128,12 +133,13 @@ class AStar(Solver):
                     LIBDSC.heap_increase_alloc(frontier_p)
 
             if self.env.multiple_is_solved(neighbour_states).any():
-                longest_path = LIBDSC.astar_longest_path(search_state_p) + 1
-                actions = torch.empty(longest_path, dtype=torch.uint8)
-                solved_state_index = torch.where(self.env.multiple_is_solved(neighbour_states))[0][0].item()
-                actions[0] = solved_state_index % len(self.env.action_space)
-                final_state = current_states[solved_state_index // len(self.env.action_space)]
-                solved = True
+                with TT.profile("Solve cleanup"):
+                    longest_path = LIBDSC.astar_longest_path(search_state_p) + 1
+                    actions = torch.empty(longest_path, dtype=torch.uint8)
+                    solved_state_index = torch.where(self.env.multiple_is_solved(neighbour_states))[0][0].item()
+                    actions[0] = solved_state_index % len(self.env.action_space)
+                    final_state = current_states[solved_state_index // len(self.env.action_space)]
+                    solved = True
                 TT.end_profile()
                 break
 
@@ -166,7 +172,14 @@ class AStar(Solver):
                 )
                 actions = actions[:num_actions].flip(0)
 
-        states_seen = LIBDSC.astar_free(search_state_p)
+        states_seen = LIBDSC.astar_num_states(search_state_p)
+
+        # Freeing takes upwards of 15 % of total runtime due to slow hashmap free,
+        # so it is done in a none-blocking manner
+        def free():
+            LIBDSC.astar_free(search_state_p)
+        thread = threading.Thread(target=free)
+        thread.start()
 
         TT.end_profile()
 

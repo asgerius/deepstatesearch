@@ -50,12 +50,10 @@ astar_search *astar_init(
     return search;
 }
 
-size_t astar_free(astar_search *search) {
-    size_t num_states = hashmap_count(search->node_map);
+void astar_free(astar_search *search) {
     hashmap_free(search->node_map);
     heap_free(search->frontier);
     free(search);
-    return num_states;
 }
 
 void *astar_frontier_ptr(astar_search *search) {
@@ -73,6 +71,8 @@ void astar_add_initial_state(
 
     hashmap_set(search->node_map, new_node_p);
     heap_insert(search->frontier, 1, &h, state);
+
+    free(new_node_p);
 }
 
 void astar_insert_neighbours(
@@ -135,6 +135,8 @@ void astar_insert_neighbours(
                 hashmap_set(search->node_map, new_node_p);
                 search->longest_path = MAX(search->longest_path, new_node_p->g);
                 heap_insert(search->frontier, 1, &new_node_p->f, new_node_p->state);
+
+                free(new_node_p);
             }
         }
     }
@@ -176,4 +178,8 @@ size_t astar_retrace_path(
     }
 
     return i;
+}
+
+size_t astar_num_states(astar_search *search_state) {
+    return hashmap_count(search_state->node_map);
 }

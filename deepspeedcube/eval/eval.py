@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
+import psutil
 import torch
 from pelutils import DataStorage, log, TT, thousands_seperators
 from pelutils.parser import JobDescription
@@ -33,6 +35,7 @@ class EvalResults(DataStorage, json_name="eval_results.json", indent=4):
     solve_times:   list[list[float]]
     states_seen:   list[list[int]]
     solve_lengths: list[list[int | None]]
+    mem_usage:     list[list[int]]
 
 @torch.no_grad()
 def eval(job: JobDescription):
@@ -97,6 +100,7 @@ def eval(job: JobDescription):
         solve_times   = list(),
         states_seen   = list(),
         solve_lengths = list(),
+        mem_usage     = list(),
     )
 
     log.section("Evaluating")
@@ -108,6 +112,7 @@ def eval(job: JobDescription):
         results.solve_times.append(list())
         results.states_seen.append(list())
         results.solve_lengths.append(list())
+        results.mem_usage.append(list())
 
         TT.profile("Evaluate at depth %i" % depth)
 
@@ -120,6 +125,7 @@ def eval(job: JobDescription):
             results.solve_times[-1].append(time)
             results.states_seen[-1].append(states_seen)
             results.solve_lengths[-1].append(len(actions) if did_solve else -1)
+            results.mem_usage[-1].append(psutil.Process(os.getpid()).memory_info().rss)
 
             log.debug(
                 "Solved: %s" % did_solve,
