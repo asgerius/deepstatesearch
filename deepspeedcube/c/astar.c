@@ -85,6 +85,19 @@ void astar_insert_neighbours(
     astar_search *search
 ) {
 
+    // Get current nodes in parallel
+    float *g_current = malloc(num_current_states * sizeof(*g_current));
+    #pragma omp parallel for
+    for (size_t i = 0; i < num_current_states; ++ i) {
+        node tmp_node = {
+            .arrival_action = NULL_ACTION,
+            .f = 0, .g = 0,
+            .state_size = search->state_size,
+            .state = current_states + i * search->state_size,
+        };
+        g_current[i] = ((node *)hashmap_get(search->node_map, &tmp_node))->g;
+    }
+
     // A temporary node used for node lookups. The state pointer is changed
     // such that it is not necessary to create new nodes just for looking up
     // existing nodes. Do NOT use for creating new nodes, as the state pointer
@@ -100,18 +113,13 @@ void astar_insert_neighbours(
     // i is the number of the current state, and j is the j'th neighbour of i
     size_t neighbours_per_state = num_neighbour_states / num_current_states;
     for (size_t i = 0; i < num_current_states; ++ i) {
-        void *current = current_states + i * search->state_size;
-
-        tmp_node.state = current;
-        node *current_node = hashmap_get(search->node_map, &tmp_node);
-        size_t g_current = current_node->g;
+        size_t g_tentative = g_current[i] + 1;
 
         #pragma unroll
         for (action j = 0; j < neighbours_per_state; ++ j) {
             size_t neighbour_index = i * neighbours_per_state + j;
             void *neighbour = neighbour_states + neighbour_index * search->state_size;
 
-            size_t g_tentative = g_current + 1;
             tmp_node.state = neighbour;
             node *neighbour_node = hashmap_get(search->node_map, &tmp_node);
 
@@ -133,8 +141,8 @@ void astar_insert_neighbours(
                     neighbour
                 );
                 hashmap_set(search->node_map, new_node_p);
-                search->longest_path = MAX(search->longest_path, new_node_p->g);
                 heap_insert(search->frontier, 1, &new_node_p->f, new_node_p->state);
+                search->longest_path = MAX(search->longest_path, new_node_p->g);
 
                 free(new_node_p);
             }
