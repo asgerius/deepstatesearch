@@ -7,25 +7,11 @@ heap *heap_alloc(size_t element_size) {
     heap_p->element_size = element_size;
     heap_p->num_elems = 1;
     heap_p->num_alloc = HEAP_BASE_SIZE;
-    heap_p->num_data_arrays = 1;
-    heap_p->data = malloc(sizeof(void *));
-    heap_p->data[0] = malloc(HEAP_BASE_SIZE * element_size * heap_p->num_alloc);
-
-    heap_p->entries[0].data = heap_p->data[0];
-
-    #pragma omp parallel for
-    for (size_t i = 1; i < heap_p->num_alloc; ++ i) {
-        heap_p->entries[i].data = heap_p->entries[0].data + i * element_size;
-    }
 
     return heap_p;
 }
 
 void heap_free(heap *heap_p) {
-    for (size_t i = 0; i < heap_p->num_data_arrays; ++ i) {
-        free(heap_p->data[i]);
-    }
-    free(heap_p->data);
     free(heap_p->entries);
     free(heap_p);
 }
@@ -45,25 +31,7 @@ void heap_increase_alloc(heap *heap_p) {
     free(heap_p->entries);
     heap_p->entries = new_entry_array;
 
-    // Create new data array
-    void **new_data_arrays = malloc((heap_p->num_data_arrays + 1) * sizeof(void *));
-    for (size_t i = 0; i < heap_p->num_data_arrays; ++ i) {
-        new_data_arrays[i] = heap_p->data[i];
-    }
-    free(heap_p->data);
-    heap_p->data = new_data_arrays;
-    void *new_data = malloc(heap_p->num_alloc * heap_p->element_size);
-    heap_p->data[heap_p->num_data_arrays] = new_data;
-    heap_p->entries[heap_p->num_alloc].data = new_data;
-
-    // Set pointers in the new entries to the new array
-    #pragma omp parallel for
-    for (size_t i = heap_p->num_alloc + 1; i < 2 * heap_p->num_alloc; ++ i) {
-        heap_p->entries[i].data = new_data + (i - heap_p->num_alloc) * heap_p->element_size;
-    }
-
     heap_p->num_alloc *= 2;
-    ++ heap_p->num_data_arrays;
 }
 
 void bubble_up(heap *heap_p, size_t index) {
@@ -156,11 +124,7 @@ void heap_insert(heap *heap_p, size_t n, const float *keys, const void *data) {
 
     for (size_t i = 0; i < n; ++ i) {
         heap_p->entries[heap_p->num_elems].key = keys[i];
-        memcpy(
-            heap_p->entries[heap_p->num_elems].data,
-            data + i * heap_p->element_size,
-            heap_p->element_size
-        );
+        heap_p->entries[heap_p->num_elems].data = data;
 
         bubble_up(heap_p, heap_p->num_elems);
 
