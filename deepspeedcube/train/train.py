@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 
 import numpy as np
 import torch
-import torch.optim as optim
+import torch.cuda.amp as amp
 import torch.nn as nn
+import torch.optim as optim
 from pelutils import log, thousands_seperators, TT
 from pelutils.datastorage import DataStorage
 from pelutils.parser import JobDescription
@@ -29,6 +31,7 @@ class TrainConfig(DataStorage, json_name="train_config.json", indent=4):
     tau_every:       int
     weight_decay:    float
     epsilon:         float
+    fp16:            bool
 
 @dataclass
 class TrainResults(DataStorage, json_name="train_results.json", indent=4):
@@ -54,7 +57,8 @@ def train(job: JobDescription):
         tau             = job.tau,
         tau_every       = job.tau_every,
         weight_decay    = job.weight_decay,
-        epsilon = job.epsilon,
+        epsilon         = job.epsilon,
+        fp16            = job.fp16,
     )
     log("Got training config", train_cfg)
 
@@ -82,6 +86,7 @@ def train(job: JobDescription):
     gen_models: list[Model] = list()
     optimizers = list()
     schedulers = list()
+    scalers = list()
     for _ in range(train_cfg.num_models):
         TT.profile("Build model")
         model = Model(model_cfg).to(device)
@@ -90,10 +95,13 @@ def train(job: JobDescription):
         clone_model(model, gen_model)
         optimizer = optim.AdamW(model.parameters(), lr=train_cfg.lr, weight_decay=train_cfg.weight_decay)
         scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=train_cfg.batches)
+        scaler = amp.grad_scaler.GradScaler()
+
         models.append(model)
         gen_models.append(gen_model)
         optimizers.append(optimizer)
         schedulers.append(scheduler)
+        scalers.append(scaler)
         TT.end_profile()
     log(
         "Built %i models" % train_cfg.num_models,
@@ -110,6 +118,12 @@ def train(job: JobDescription):
     batches_per_gen = get_batches_per_gen(env, train_cfg.num_models * train_cfg.batch_size)
     log("Generating states every %i batches" % batches_per_gen)
 
+    num_states_update = train_cfg.batches * train_cfg.batch_size
+    num_states_total = num_states_update * (1 + len(env.action_space))
+    log("During training, each model will perform updates from %s cost-to-go estimates and see %s states in total" % (
+        thousands_seperators(num_states_update), thousands_seperators(num_states_total)
+    ))
+
     for i in range(train_cfg.batches):
 
         if i in eval_batches:
@@ -121,7 +135,7 @@ def train(job: JobDescription):
             states, depths = gen_new_states(env, 10 ** 4, train_cfg.scramble_depth)
             states_d = states.to(device)
             states_oh = env.multiple_oh(states_d)
-            with TT.profile("Value estimates"), torch.no_grad():
+            with TT.profile("Value estimates"), torch.no_grad(), amp.autocast() if train_cfg.fp16 else contextlib.ExitStack():
                 preds = torch.zeros(len(states_d), device=device)
                 for model in models:
                     preds += model(states_oh).squeeze()
@@ -192,7 +206,7 @@ def train(job: JobDescription):
                 neighbour_states_oh = env.multiple_oh(neighbour_states_d)
             assert neighbour_states_d.is_contiguous() and neighbour_states_oh.is_contiguous()
 
-            with TT.profile("Forward pass"), torch.no_grad():
+            with TT.profile("Forward pass"), torch.no_grad(), amp.autocast() if train_cfg.fp16 else contextlib.ExitStack():
                 J = gen_model(neighbour_states_oh).squeeze()
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
@@ -211,14 +225,19 @@ def train(job: JobDescription):
                 states_oh = env.multiple_oh(states_d)
             assert states_d.is_contiguous() and states_oh.is_contiguous()
 
-            with TT.profile("Train model"):
+            with TT.profile("Train model"), amp.autocast() if train_cfg.fp16 else contextlib.ExitStack():
                 preds = model(states_oh).squeeze()
                 loss = criterion(preds, targets)
-                loss.backward()
+                if train_cfg.fp16:
+                    scalers[j].scale(loss).backward()
+                    scalers[j].step(optimizer)
+                    scalers[j].update()
+                else:
+                    loss.backward()
+                    optimizer.step()
+                optimizer.zero_grad()
                 log.debug("Loss: %.4f" % loss.item())
                 train_results.losses[j].append(loss.item())
-                optimizer.step()
-                optimizer.zero_grad()
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
+
 from pelutils import log, TT
-from pelutils.parser import Option, Parser
+from pelutils.parser import Flag, Option, Parser
 
 from deepspeedcube import HardwareInfo
 from deepspeedcube.train.train import train
@@ -23,6 +25,7 @@ options = (
     Option("dropout",             default=0, type=float),
     Option("weight-decay",        default=0, type=float),
     Option("epsilon",             default=1e6, type=float),
+    Flag("fp16"),
 )
 
 if __name__ == "__main__":
