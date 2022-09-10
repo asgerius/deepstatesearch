@@ -79,7 +79,8 @@ def eval(job: JobDescription):
         TT.end_profile()
 
         with TT.profile("Warmup"):
-            model(env.get_multiple_solved(1))
+            model(env.multiple_oh(env.get_multiple_solved(1).to(device)))
+            torch.cuda.synchronize()
 
         if i == 0:
             log.debug(

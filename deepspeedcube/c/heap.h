@@ -14,7 +14,7 @@
 
 struct heap_entry {
     float key;
-    void *data;
+    const void *data;
 };
 
 typedef struct heap_entry heap_entry;
@@ -27,8 +27,6 @@ struct heap {
     // that memory has been allocated for
     size_t num_elems;
     size_t num_alloc;
-    size_t num_data_arrays;
-    void **data;
 };
 
 typedef struct heap heap;
