@@ -49,7 +49,7 @@ class GreedyValueSolver(Solver):
         while self.tt.tock() < self.max_time:
             TT.profile("Iteration")
 
-            neighbours = self.env.neighbours(state.unsqueeze(dim=0))
+            _, neighbours = self.env.neighbours(state.unsqueeze(dim=0))
             # NB: This overestimates the number of states, as duplicates are not detected
             # This is somewhat corrected by removing one, which is the previous state
             states_seen += len(neighbours) - 1
@@ -125,7 +125,7 @@ class AStar(Solver):
             with TT.profile("Extract from frontier"):
                 _, current_states = self.extract_min(frontier_p)
             with TT.profile("Get neighbours"):
-                neighbour_states = self.env.neighbours(current_states)
+                _, neighbour_states = self.env.neighbours(current_states)
 
             # Make sure there is enough space in the heap, as astar_iteration
             # usually adds new states without allocating more memory
@@ -147,7 +147,6 @@ class AStar(Solver):
                 break
 
             h = self.h(neighbour_states)
-            # h = torch.zeros(len(neighbour_states))
 
             with TT.profile("Update search state"):
                 LIBDSC.astar_iteration(

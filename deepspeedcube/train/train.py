@@ -169,7 +169,7 @@ def train(job: JobDescription):
                     train_cfg.scramble_depth,
                 )
             with TT.profile("Generate neighbour states"):
-                all_neighbour_states = env.neighbours(all_states)
+                _, all_neighbour_states = env.neighbours(all_states)
 
             all_states = all_states.view(
                 batches_per_gen,

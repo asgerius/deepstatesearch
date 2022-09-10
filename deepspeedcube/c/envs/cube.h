@@ -8,6 +8,6 @@
 
 typedef char face;
 
-void cube_multi_act(face *states, action *actions, size_t n);
+void cube_multi_act(face *states, const action *actions, size_t n);
 
 #endif

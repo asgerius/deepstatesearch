@@ -1,7 +1,6 @@
 #ifndef ASTAR_H
 #define ASTAR_H
 
-#include <limits.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +10,6 @@
 #include "envs/cube.h"
 #include "hashmap.c/hashmap.h"
 
-#define NULL_ACTION (action)UCHAR_MAX
 #define NUM_STATES_PER_ARRAY(state_size) (10000000 / (state_size))
 
 

@@ -48,11 +48,11 @@ class Environment(abc.ABC):
         pass
 
     @classmethod
-    def neighbours(cls, states: torch.Tensor) -> torch.Tensor:
+    def neighbours(cls, states: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         neighbour_states = states.repeat_interleave(len(cls.action_space), dim=0)
         actions = cls.action_space.repeat(len(states)).to(states.device)
         cls.multiple_moves(actions, neighbour_states, inplace=True)
-        return neighbour_states
+        return actions, neighbour_states
 
     @classmethod
     def oh(cls, state: torch.Tensor) -> torch.Tensor:
@@ -234,6 +234,10 @@ class _SlidingPuzzle(Environment):
         )
 
         return states
+    
+    @classmethod
+    def neighbours(cls, states: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        actions, neighbour_states = super().neighbours(states)
 
     @classmethod
     def oh(cls, state: torch.Tensor) -> torch.Tensor:
