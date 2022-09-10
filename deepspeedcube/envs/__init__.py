@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import abc
 import ctypes
-from typing import Type
+from typing import Optional, Type
 
 import numpy as np
 import torch

@@ -118,17 +118,20 @@ class AStar(Solver):
 
             TT.profile("Iteration")
 
-            _, current_states = self.extract_min(frontier_p)
+            with TT.profile("Extract from frontier"):
+                _, current_states = self.extract_min(frontier_p)
             with TT.profile("Get neighbours"):
                 neighbour_states = self.env.neighbours(current_states)
 
-            # Make sure there is enough space in the heap, as astar_insert_neighbours
+            # Make sure there is enough space in the heap, as astar_iteration
             # usually adds new states without allocating more memory
             while LIBDSC.heap_should_increase_alloc(frontier_p, ctypes.c_size_t(len(neighbour_states))):
                 with TT.profile("Expand frontier"):
                     LIBDSC.heap_increase_alloc(frontier_p)
 
-            if self.env.multiple_is_solved(neighbour_states).any():
+            with TT.profile("Check for solution"):
+                any_solved = self.env.multiple_is_solved(neighbour_states).any()
+            if any_solved:
                 with TT.profile("Solve cleanup"):
                     longest_path = LIBDSC.astar_longest_path(search_state_p) + 1
                     actions = torch.empty(longest_path, dtype=torch.uint8)
@@ -142,7 +145,7 @@ class AStar(Solver):
             h = self.h(neighbour_states)
 
             with TT.profile("Update search state"):
-                LIBDSC.astar_insert_neighbours(
+                LIBDSC.astar_iteration(
                     ctypes.c_size_t(len(current_states)),
                     ptr(current_states),
                     ctypes.c_size_t(len(neighbour_states)),
@@ -170,12 +173,8 @@ class AStar(Solver):
 
         states_seen = LIBDSC.astar_num_states(search_state_p)
 
-        # Freeing takes upwards of 15 % of total runtime due to slow hashmap free,
-        # so it is done in a none-blocking manner
-        def free():
+        with TT.profile("Free memory"):
             LIBDSC.astar_free(search_state_p)
-        thread = threading.Thread(target=free)
-        thread.start()
 
         TT.end_profile()
 
@@ -185,11 +184,10 @@ class AStar(Solver):
         return None, self.tt.tock(), states_seen
 
     def extract_min(self, frontier_p: ctypes.c_void_p) -> torch.Tensor:
-        with TT.profile("Extract from frontier"):
-            keys_arr = torch.empty((self.N, ), dtype=torch.float)
-            data_arr = torch.empty((self.N, *self.env.state_shape), dtype=self.env.dtype)
-            num_extracted = LIBDSC.heap_extract_min(frontier_p, self.N, ptr(keys_arr), ptr(data_arr))
-            return keys_arr[:num_extracted], data_arr[:num_extracted]
+        keys_arr = torch.empty((self.N, ), dtype=torch.float)
+        data_arr = torch.empty((self.N, *self.env.state_shape), dtype=self.env.dtype)
+        num_extracted = LIBDSC.heap_extract_min(frontier_p, self.N, ptr(keys_arr), ptr(data_arr))
+        return keys_arr[:num_extracted], data_arr[:num_extracted]
 
     @torch.no_grad()
     def h(self, states: torch.Tensor) -> torch.Tensor:

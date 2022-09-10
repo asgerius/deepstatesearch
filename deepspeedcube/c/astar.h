@@ -12,6 +12,7 @@
 #include "hashmap.c/hashmap.h"
 
 #define NULL_ACTION (action)UCHAR_MAX
+#define NUM_STATES_PER_ARRAY(state_size) (10000000 / (state_size))
 
 
 struct node {
@@ -28,6 +29,9 @@ struct astar_search {
     size_t state_size;
     struct hashmap *node_map;
     heap *frontier;
+
+    size_t num_used_states;
+    void *states;
 };
 
 typedef struct node node;
@@ -51,12 +55,12 @@ void astar_add_initial_state(
 
 /* A* iteration step. A lot of the nomenclature follows the pseudocode on
 https://en.wikipedia.org/wiki/A*_search_algorithm. */
-void astar_insert_neighbours(
-    size_t num_current_states,  // 1 until batched A* is implemented
-    void *current_states,
+void astar_iteration(
+    size_t num_current_states,
+    const void *current_states,
     size_t num_neighbour_states,
     void *neighbour_states,
-    float *h,
+    const float *h,
     action *arrival_actions,
     astar_search *search
 );
