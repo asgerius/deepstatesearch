@@ -27,6 +27,7 @@ class EvalConfig(DataStorage, json_name="eval_cfg.json", indent=4):
     astar_d:          int
     solver_name:      str
     validate:         bool
+    fp16:             bool
 
 @dataclass
 class EvalResults(DataStorage, json_name="eval_results.json", indent=4):
@@ -48,8 +49,9 @@ def eval(job: JobDescription):
         astar_lambda     = job.astar_lambda,
         astar_n          = job.astar_n,
         astar_d          = job.astar_d,
+        solver_name      = "",  # Set later
         validate         = job.validate,
-        solver_name      = ""  # Set later
+        fp16            = job.fp16,
     )
     log("Got eval config", eval_cfg)
 
@@ -85,9 +87,10 @@ def eval(job: JobDescription):
 
     log.section("Preparing solver")
     if eval_cfg.solver == "GreedyValueSolver":
-        solver = GreedyValueSolver(env, eval_cfg.max_time, models)
+        solver = GreedyValueSolver(env, eval_cfg.max_time, models, eval_cfg.fp16)
     elif eval_cfg.solver == "AStar":
-        solver = AStar(env, eval_cfg.max_time, models,
+        solver = AStar(
+            env, eval_cfg.max_time, models,eval_cfg.fp16,
             eval_cfg.astar_lambda, eval_cfg.astar_n, eval_cfg.astar_d,
         )
     else:

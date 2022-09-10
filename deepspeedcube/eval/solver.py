@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import abc
+import contextlib
 import ctypes
-import threading
 
 import torch
+import torch.cuda.amp as amp
 from pelutils import TickTock, TT
 
 from deepspeedcube import device, LIBDSC, ptr, tensor_size
@@ -30,11 +31,12 @@ class Solver(abc.ABC):
 
 class GreedyValueSolver(Solver):
 
-    def __init__(self, env: Environment, max_time: float | None, models: list[Model]):
+    def __init__(self, env: Environment, max_time: float | None, models: list[Model], fp16: bool):
         super().__init__(env, max_time)
         self.models = models
         for model in self.models:
             model.eval()
+        self.fp16 = fp16
 
     @torch.no_grad()
     def solve(self, state: torch.Tensor) -> tuple[torch.Tensor | None, float, int]:
@@ -61,8 +63,9 @@ class GreedyValueSolver(Solver):
 
             neighbours_oh = self.env.multiple_oh(neighbours_d)
             preds = torch.zeros(len(neighbours_oh), device=device)
-            for model in self.models:
-                preds += model(neighbours_oh).squeeze()
+            with amp.autocast() if self.fp16 else contextlib.ExitStack():
+                for model in self.models:
+                    preds += model(neighbours_oh).squeeze()
 
             action = preds.argmin().item()
             actions.append(action)
@@ -78,9 +81,10 @@ class GreedyValueSolver(Solver):
 
 class AStar(Solver):
 
-    def __init__(self, env: Environment, max_time: float | None, models: list[Model], l: float, N: int, d: int):
+    def __init__(self, env: Environment, max_time: float | None, models: list[Model], fp16: bool, l: float, N: int, d: int):
         super().__init__(env, max_time)
         self.models = models
+        self.fp16 = fp16
         self.l = l  # lambda used to weigh moves spent and estimated cost-to-go
         self.N = N  # Number of states to expand each iteration
         self.d = d  # Depth expansion
@@ -201,7 +205,7 @@ class AStar(Solver):
                 torch.cuda.synchronize()
 
         preds = torch.zeros(len(states), dtype=torch.float, device=device)
-        with TT.profile("Estimate cost-to-go"):
+        with TT.profile("Estimate cost-to-go"), amp.autocast() if self.fp16 else contextlib.ExitStack():
             for model in self.models:
                 preds += model(states_oh).squeeze()
             if torch.cuda.is_available():
