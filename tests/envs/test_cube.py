@@ -2,7 +2,6 @@ import random
 
 import torch
 
-from deepspeedcube import device
 from deepspeedcube.envs import get_env
 
 
@@ -108,5 +107,5 @@ def test_multiple_moves():
         states[i] = env.move(action, states[i])
 
     states2 = torch.vstack([env.get_solved()]*len(env.action_space))
-    states2 = env.multiple_moves(env.action_space.to(device), states2)
+    states2 = env.multiple_moves(env.action_space, states2)
     assert torch.all(states == states2)
