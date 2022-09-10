@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from pelutils import log, TT
+from pelutils import log, TT, LogLevels
 from pelutils.parser import Parser, Flag, Option
 
 from deepspeedcube import HardwareInfo
@@ -19,6 +19,7 @@ options = (
     Option("astar-d",          default=1),
     Flag("validate"),
     Flag("range"),
+    Flag("fp16"),
 )
 
 if __name__ == "__main__":
@@ -27,7 +28,7 @@ if __name__ == "__main__":
 
     for i, job in enumerate(jobs):
         TT.reset()
-        log.configure(f"{job.location}/eval.log")
+        log.configure(f"{job.location}/eval.log", print_level=LogLevels.DEBUG)
         with log.log_errors:
             log.section(f"Evaluating {i+1} / {len(jobs)}: {job.name}")
             log.log_repo()
