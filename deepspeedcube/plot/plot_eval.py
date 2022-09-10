@@ -65,6 +65,16 @@ def plot_states_seen(loc: str, cfg: EvalConfig, res: EvalResults):
         plt.ylabel("States seen")
         plt.grid()
 
+def plot_memory_usage(loc: str, cfg: EvalConfig, res: EvalResults):
+    with plots.Figure(f"{loc}/plots-eval/memory-usage.png"):
+        memory_usage = np.array(res.mem_usage).ravel()
+
+        plt.plot(memory_usage / 2 ** 20, "-o")
+        plt.title("Memory usage during evaluation")
+        plt.xlabel("Evaluated states")
+        plt.ylabel("Memory usage [MB]")
+        plt.grid()
+
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("location")
@@ -88,6 +98,7 @@ if __name__ == "__main__":
         plot_solve_pct(loc, cfg, res)
         plot_solve_rate_time(loc, cfg, res)
         plot_states_seen(loc, cfg, res)
+        plot_memory_usage(loc, cfg, res)
 
     log("Plotting combined")
     plot_solve_pct_all(args.location, configs, results)
