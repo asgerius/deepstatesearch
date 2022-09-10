@@ -78,6 +78,9 @@ def eval(job: JobDescription):
         models.append(model)
         TT.end_profile()
 
+        with TT.profile("Warmup"):
+            model(env.get_multiple_solved(1))
+
         if i == 0:
             log.debug(
                 "Parameters per model: %s" % thousands_seperators(model.numel()),
