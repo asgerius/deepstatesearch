@@ -51,6 +51,22 @@ def plot_solve_rate_time(loc: str, cfg: EvalConfig, res: EvalResults):
             plt.ylim([-7, 107])
             plt.grid()
 
+def plot_solve_states_seen(loc: str, cfg: EvalConfig, res: EvalResults):
+    with plots.Figure(f"{loc}/plots-eval/solve-rate-states.png"):
+        solved = np.array(res.solved)[-1]
+        states_seen = np.array(res.states_seen)[-1, solved]
+        states_seen = np.sort(states_seen)
+        solved_frac = np.linspace(0, solved.mean(), 1 + len(states_seen))[1:]
+
+        if solved.any():
+            plt.plot(states_seen, 100 * solved_frac, "--o")
+
+            plt.xlabel("States seen during search")
+            plt.ylabel("Solved states [%]")
+            plt.xlim([-0.07 * states_seen.max(), 1.07 * states_seen.max()])
+            plt.ylim([-7, 107])
+            plt.grid()
+
 def plot_states_seen(loc: str, cfg: EvalConfig, res: EvalResults):
     with plots.Figure(f"{loc}/plots-eval/states-seen.png"):
         solved = np.array(res.solved[-1])
@@ -97,6 +113,7 @@ if __name__ == "__main__":
 
         plot_solve_pct(loc, cfg, res)
         plot_solve_rate_time(loc, cfg, res)
+        plot_solve_states_seen(loc, cfg, res)
         plot_states_seen(loc, cfg, res)
         plot_memory_usage(loc, cfg, res)
 
