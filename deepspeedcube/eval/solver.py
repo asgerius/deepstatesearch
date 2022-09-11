@@ -146,7 +146,8 @@ class AStar(Solver):
                 TT.end_profile()
                 break
 
-            h = self.h(neighbour_states)
+            # h = self.h(neighbour_states)
+            h = torch.zeros(len(neighbour_states), dtype=torch.float)
 
             with TT.profile("Update search state"):
                 LIBDSC.astar_iteration(
@@ -205,7 +206,8 @@ class AStar(Solver):
                 torch.cuda.synchronize()
 
         preds = torch.zeros(len(states), dtype=torch.float, device=device)
-        with TT.profile("Estimate cost-to-go"), amp.autocast() if self.fp16 else contextlib.ExitStack():
+        with TT.profile("Estimate cost-to-go"), \
+            amp.autocast() if self.fp16 and torch.cuda.is_available() else contextlib.ExitStack():
             for model in self.models:
                 preds += model(states_oh).squeeze()
             if torch.cuda.is_available():

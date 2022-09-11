@@ -60,6 +60,7 @@ def train(job: JobDescription):
         epsilon         = job.epsilon,
         fp16            = job.fp16,
     )
+    train_cfg.fp16 = train_cfg.fp16 and torch.cuda.is_available()
     log("Got training config", train_cfg)
 
     log("Setting up environment '%s'" % train_cfg.env)
@@ -95,7 +96,7 @@ def train(job: JobDescription):
         clone_model(model, gen_model)
         optimizer = optim.AdamW(model.parameters(), lr=train_cfg.lr, weight_decay=train_cfg.weight_decay)
         scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=train_cfg.batches)
-        scaler = amp.grad_scaler.GradScaler()
+        scaler = amp.grad_scaler.GradScaler() if train_cfg.fp16 else None
 
         models.append(model)
         gen_models.append(gen_model)
