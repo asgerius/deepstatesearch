@@ -1,6 +1,7 @@
 #ifndef HEAP_H
 #define HEAP_H
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -10,6 +11,7 @@
 #define HEAP_PARENT(x) ((x) / 2)
 #define HEAP_LEFT(x) (2 * (x))
 #define HEAP_RIGHT(x) (2 * (x) + 1)
+#define EITHER_OR(cond, x, y) ((cond) * (x) + (!(cond)) * (y))
 
 
 struct heap_entry {

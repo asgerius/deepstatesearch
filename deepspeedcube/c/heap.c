@@ -44,20 +44,21 @@ void bubble_up(heap *heap_p, size_t index) {
     float key_node = heap_p->entries[index].key;
     float key_parent = heap_p->entries[index_parent].key;
 
-    if (key_node < key_parent) {
+    while (key_node < key_parent && index > 1) {
         // Heap order violated, so swap elements
         heap_entry entry_tmp = heap_p->entries[index];
         heap_p->entries[index] = heap_p->entries[index_parent];
         heap_p->entries[index_parent] = entry_tmp;
 
-        bubble_up(heap_p, index_parent);
+        index = index_parent;
+        index_parent = HEAP_PARENT(index);
+
+        key_node = heap_p->entries[index].key;
+        key_parent = heap_p->entries[index_parent].key;
     }
 }
 
 void bubble_down(heap *heap_p, size_t index) {
-    if (index == heap_p->num_elems - 1) {
-        return;
-    }
 
     size_t index_left = HEAP_LEFT(index);
     size_t index_right = HEAP_RIGHT(index);
@@ -68,30 +69,39 @@ void bubble_down(heap *heap_p, size_t index) {
     }
     // Only the left child exist, so make both children the same to
     // make all following logic work without the need for exceptions
-    index_right = (index_right > heap_p->num_elems) * index_left
-                + (index_right <= heap_p->num_elems) * index_right;
+    index_right = EITHER_OR(index_right > heap_p->num_elems, index_left, index_right);
 
     float key_node = heap_p->entries[index].key;
     float key_left = heap_p->entries[index_left].key;
     float key_right = heap_p->entries[index_right].key;
 
-    float key_child;
-    size_t index_child;
-    if (key_left < key_right) {
-        key_child = key_left;
-        index_child = index_left;
-    } else {
-        key_child = key_right;
-        index_child = index_right;
-    }
+    bool key_left_smaller = key_left < key_right;
+    float key_child = EITHER_OR(key_left_smaller, key_left, key_right);
+    size_t index_child = EITHER_OR(key_left_smaller, index_left, index_right);
 
-    if (key_node > key_child) {
+    while (key_node > key_child && index < heap_p->num_elems - 1) {
         // Heap order violated, so swap elements
         heap_entry entry_tmp = heap_p->entries[index];
         heap_p->entries[index] = heap_p->entries[index_child];
         heap_p->entries[index_child] = entry_tmp;
 
-        bubble_down(heap_p, index_child);
+        index = index_child;
+        index_left = HEAP_LEFT(index);
+        index_right = HEAP_RIGHT(index);
+
+        if (index_left > heap_p->num_elems) {
+            // No children, so stop here
+            return;
+        }
+        index_right = EITHER_OR(index_right > heap_p->num_elems, index_left, index_right);
+
+        key_node = heap_p->entries[index].key;
+        key_left = heap_p->entries[index_left].key;
+        key_right = heap_p->entries[index_right].key;
+
+        key_left_smaller = key_left < key_right;
+        key_child = EITHER_OR(key_left_smaller, key_left, key_right);
+        index_child = EITHER_OR(key_left_smaller, index_left, index_right);
     }
 }
 

@@ -146,8 +146,7 @@ class AStar(Solver):
                 TT.end_profile()
                 break
 
-            # h = self.h(neighbour_states)
-            h = torch.zeros(len(neighbour_states), dtype=torch.float)
+            h = self.h(neighbour_states)
 
             with TT.profile("Update search state"):
                 LIBDSC.astar_iteration(
