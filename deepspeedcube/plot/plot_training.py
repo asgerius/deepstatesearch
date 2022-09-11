@@ -23,7 +23,7 @@ def plot_value_estimates(loc: str, cfg: TrainConfig, res: TrainResults):
     with plots.Figure(f"{loc}/plots-train/value-estimates.png"):
         Ks = (1, 3, 5, 7, 10, 13, 15, 17, 20, 30)
         for K in Ks:
-            if K > cfg.scramble_depth:
+            if K > cfg.K:
                 break
             plt.plot(res.eval_idx, res.value_estimations[K-1], label="$K=%i$" % K)
 

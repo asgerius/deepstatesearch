@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import abc
 import ctypes
-from typing import Optional, Type
+from typing import Type
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 
-from deepspeedcube import device, ptr, tensor_size, LIBDSC
+from deepspeedcube import ptr, tensor_size, LIBDSC
 
 
-if torch.cuda.is_available():
-    _CUBELIB_CUDA = ctypes.cdll.LoadLibrary("lib/cube_cuda.so")
+NULL_ACTION = 255
 
 class Environment(abc.ABC):
 
@@ -50,7 +49,7 @@ class Environment(abc.ABC):
     @classmethod
     def neighbours(cls, states: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         neighbour_states = states.repeat_interleave(len(cls.action_space), dim=0)
-        actions = cls.action_space.repeat(len(states)).to(states.device)
+        actions = cls.action_space.repeat(len(states))
         cls.multiple_moves(actions, neighbour_states, inplace=True)
         return actions, neighbour_states
 
@@ -206,7 +205,7 @@ class _SlidingPuzzle(Environment):
 
     size: ctypes.c_short
     dtype = torch.int16
-    action_space = torch.arange(4, dtype=dtype)
+    action_space = torch.arange(4, dtype=torch.uint8)
 
     @classmethod
     def move(cls, action: int, state: torch.Tensor) -> torch.Tensor:
@@ -229,7 +228,7 @@ class _SlidingPuzzle(Environment):
         LIBDSC.sliding_multi_act(
             ptr(states),
             ptr(actions),
-            len(actions),
+            ctypes.c_size_t(len(actions)),
             cls.size,
         )
 
@@ -238,6 +237,14 @@ class _SlidingPuzzle(Environment):
     @classmethod
     def neighbours(cls, states: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         actions, neighbour_states = super().neighbours(states)
+        LIBDSC.sliding_neighbours_set_null_actions(
+            ptr(states),
+            ptr(neighbour_states),
+            ptr(actions),
+            ctypes.c_size_t(len(states)),
+            cls.size,
+        )
+        return actions, neighbour_states
 
     @classmethod
     def oh(cls, state: torch.Tensor) -> torch.Tensor:
@@ -249,7 +256,7 @@ class _SlidingPuzzle(Environment):
     @classmethod
     def multiple_oh(cls, states: torch.Tensor) -> torch.Tensor:
         return F.one_hot(
-            states[2:].long(),
+            states[:, 2:].long(),
             num_classes=cls.state_oh_size // len(cls._solved_state[2:]),
         ).to(torch.float32).view(len(states), -1)
 
@@ -276,7 +283,7 @@ class _SlidingPuzzle15(_SlidingPuzzle):
     size = ctypes.c_short(15)
 
     state_shape = torch.Size([2 + 15 ** 2])
-    state_oh_size = 15 ** 2
+    state_oh_size = 15 ** 4
     _solved_state = torch.concat((
         torch.tensor([0, 0]), torch.arange(15 ** 2)
     )).to(_SlidingPuzzle.dtype)

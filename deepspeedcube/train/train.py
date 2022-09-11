@@ -14,24 +14,24 @@ from pelutils.parser import JobDescription
 
 from deepspeedcube import device, tensor_size
 from deepspeedcube.model import Model, ModelConfig
-from deepspeedcube.envs import get_env
+from deepspeedcube.envs import NULL_ACTION, get_env
 from deepspeedcube.envs.gen_states import gen_new_states, get_batches_per_gen
 from deepspeedcube.model.generator_network import clone_model, update_generator_network
 
 
 @dataclass
 class TrainConfig(DataStorage, json_name="train_config.json", indent=4):
-    env:             str
-    num_models:      int
-    batches:         int
-    batch_size:      int
-    scramble_depth:  int
-    lr:              float
-    tau:             float
-    tau_every:       int
-    weight_decay:    float
-    epsilon:         float
-    fp16:            bool
+    env:          str
+    num_models:   int
+    batches:      int
+    batch_size:   int
+    K:            int
+    lr:           float
+    tau:          float
+    tau_every:    int
+    weight_decay: float
+    epsilon:      float
+    fp16:         bool
 
 @dataclass
 class TrainResults(DataStorage, json_name="train_results.json", indent=4):
@@ -48,17 +48,17 @@ def train(job: JobDescription):
     # Args either go into the model config or into the training config
     # Those that go into the training config are filtered out here
     train_cfg = TrainConfig(
-        env             = job.env,
-        num_models      = job.num_models,
-        batches         = job.batches,
-        batch_size      = job.batch_size,
-        scramble_depth  = job.scramble_depth,
-        lr              = job.lr,
-        tau             = job.tau,
-        tau_every       = job.tau_every,
-        weight_decay    = job.weight_decay,
-        epsilon         = job.epsilon,
-        fp16            = job.fp16,
+        env          = job.env,
+        num_models   = job.num_models,
+        batches      = job.batches,
+        batch_size   = job.batch_size,
+        K            = job.k,
+        lr           = job.lr,
+        tau          = job.tau,
+        tau_every    = job.tau_every,
+        weight_decay = job.weight_decay,
+        epsilon      = job.epsilon,
+        fp16         = job.fp16,
     )
     train_cfg.fp16 = train_cfg.fp16 and torch.cuda.is_available()
     log("Got training config", train_cfg)
@@ -113,7 +113,7 @@ def train(job: JobDescription):
 
     log.section("Starting training")
     train_results = TrainResults(eval_idx=eval_batches)
-    train_results.value_estimations.extend(list() for _ in range(train_cfg.scramble_depth))
+    train_results.value_estimations.extend(list() for _ in range(train_cfg.K))
     train_results.losses.extend(list() for _ in range(train_cfg.num_models))
 
     batches_per_gen = get_batches_per_gen(env, train_cfg.num_models * train_cfg.batch_size)
@@ -133,7 +133,7 @@ def train(job: JobDescription):
             for model in models:
                 model.eval()
 
-            states, depths = gen_new_states(env, 10 ** 4, train_cfg.scramble_depth)
+            states, depths = gen_new_states(env, 10 ** 4, train_cfg.K)
             states_d = states.to(device)
             states_oh = env.multiple_oh(states_d)
             with TT.profile("Value estimates"), torch.no_grad(), amp.autocast() if train_cfg.fp16 else contextlib.ExitStack():
@@ -142,7 +142,7 @@ def train(job: JobDescription):
                     preds += model(states_oh).squeeze()
                 preds = preds / len(models)
 
-                for j in range(train_cfg.scramble_depth):
+                for j in range(train_cfg.K):
                     train_results.value_estimations[j].append(
                         preds[depths == j + 1].mean().item()
                     )
@@ -167,16 +167,21 @@ def train(job: JobDescription):
                 all_states, _ = gen_new_states(
                     env,
                     num_states,
-                    train_cfg.scramble_depth,
+                    train_cfg.K,
                 )
             with TT.profile("Generate neighbour states"):
-                _, all_neighbour_states = env.neighbours(all_states)
+                all_to_neighbour_actions, all_neighbour_states = env.neighbours(all_states)
 
             all_states = all_states.view(
                 batches_per_gen,
                 train_cfg.num_models,
                 train_cfg.batch_size,
                 *env.get_solved().shape,
+            )
+            all_to_neighbour_actions = all_to_neighbour_actions.view(
+                batches_per_gen,
+                train_cfg.num_models,
+                train_cfg.batch_size * len(env.action_space),
             )
             all_neighbour_states = all_neighbour_states.view(
                 batches_per_gen,
@@ -198,6 +203,8 @@ def train(job: JobDescription):
                 states = all_states[i % batches_per_gen, j]
                 states_d = states.to(device)
 
+                to_neighbour_actions_d = all_to_neighbour_actions[i % batches_per_gen, j].to(device)
+
                 neighbour_states = all_neighbour_states[i % batches_per_gen, j]
                 neighbour_states_d = neighbour_states.to(device)
 
@@ -218,7 +225,9 @@ def train(job: JobDescription):
             J = J.view(len(states_d), len(env.action_space))
 
             with TT.profile("Calculate targets"):
-                g = 1
+                g = (to_neighbour_actions_d != NULL_ACTION) \
+                    .to(torch.float) \
+                    .view(len(states_d), len(env.action_space))
                 targets = torch.min(g + J, dim=1).values
             TT.end_profile()
 

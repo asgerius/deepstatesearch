@@ -13,7 +13,7 @@ options = (
     Option("env",                 default="cube"),
     Option("batches",             default=10000),
     Option("batch-size",          default=1000),
-    Option("scramble-depth",      default=30),
+    Option("k",                   default=30),
     Option("lr",                  default=1e-5),
     Option("num-models",          default=1),
     Option("tau",                 default=0.1, help="1 for no generator network and 0 for static generator network"),

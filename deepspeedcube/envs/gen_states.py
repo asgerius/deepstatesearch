@@ -11,10 +11,11 @@ from deepspeedcube.envs import Environment
 
 
 def gen_new_states(env: Environment, num_states: int, K: int) -> tuple[torch.Tensor, torch.Tensor]:
+    K += 1  # Should be inclusive
     states_per_depth = ceil(num_states / K)
 
     with TT.profile("Create states"):
-        states = env.get_multiple_solved(states_per_depth*K)
+        states = env.get_multiple_solved(states_per_depth * K)
         scramble_depths = torch.zeros(len(states), dtype=torch.int32)
 
     with TT.profile("Scramble states"):
@@ -60,7 +61,7 @@ def get_batches_per_gen(env: Environment, batch_size: int) -> int:
 
     # Calculate memory requirements for scrambling
     state_memory           = tensor_size(env.get_solved())
-    scramble_depths_memory = 2  # int16
+    scramble_depths_memory = 4  # int32
     actions_memory         = 1  # uint8
     shuffle_index_memory   = 8  # int64
     scramble_memory        = state_memory + scramble_depths_memory\
