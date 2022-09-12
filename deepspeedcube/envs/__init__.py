@@ -21,6 +21,7 @@ class Environment(abc.ABC):
     state_oh_size: int
     _solved_state: torch.Tensor
     state_size: int
+    move_fn: ctypes._NamedFuncPointer
 
     @classmethod
     def get_solved(cls) -> torch.Tensor:
@@ -91,6 +92,7 @@ class _CubeEnvironment(Environment):
         dtype=dtype,
     )
     state_size = tensor_size(_solved_state)
+    move_fn = LIBDSC.cube_multi_act
 
     # If the six sides are represented by an array, the order should be F, B, T, D, L, R
     F, B, T, D, L, R = 0, 1, 2, 3, 4, 5
@@ -233,7 +235,7 @@ class _SlidingPuzzle(Environment):
         )
 
         return states
-    
+
     @classmethod
     def neighbours(cls, states: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         actions, neighbour_states = super().neighbours(states)
@@ -280,19 +282,72 @@ class _SlidingPuzzle(Environment):
 
 class _SlidingPuzzle15(_SlidingPuzzle):
 
-    size = ctypes.c_short(15)
+    size = ctypes.c_short(4)
 
-    state_shape = torch.Size([2 + 15 ** 2])
-    state_oh_size = 15 ** 4
+    state_shape = torch.Size([2 + size.value ** 2])
+    state_oh_size = size.value ** 4
     _solved_state = torch.concat((
-        torch.tensor([0, 0]), torch.arange(15 ** 2)
+        torch.tensor([0, 0]), torch.arange(size.value ** 2)
     )).to(_SlidingPuzzle.dtype)
     state_size = tensor_size(_solved_state)
+    move_fn = LIBDSC.sliding15_multi_act
+
+class _SlidingPuzzle24(_SlidingPuzzle):
+
+    size = ctypes.c_short(5)
+
+    state_shape = torch.Size([2 + size.value ** 2])
+    state_oh_size = size.value ** 4
+    _solved_state = torch.concat((
+        torch.tensor([0, 0]), torch.arange(size.value ** 2)
+    )).to(_SlidingPuzzle.dtype)
+    state_size = tensor_size(_solved_state)
+    move_fn = LIBDSC.sliding24_multi_act
+
+class _SlidingPuzzle35(_SlidingPuzzle):
+
+    size = ctypes.c_short(6)
+
+    state_shape = torch.Size([2 + size.value ** 2])
+    state_oh_size = size.value ** 4
+    _solved_state = torch.concat((
+        torch.tensor([0, 0]), torch.arange(size.value ** 2)
+    )).to(_SlidingPuzzle.dtype)
+    state_size = tensor_size(_solved_state)
+    move_fn = LIBDSC.sliding35_multi_act
+
+class _SlidingPuzzle48(_SlidingPuzzle):
+
+    size = ctypes.c_short(7)
+
+    state_shape = torch.Size([2 + size.value ** 2])
+    state_oh_size = size.value ** 4
+    _solved_state = torch.concat((
+        torch.tensor([0, 0]), torch.arange(size.value ** 2)
+    )).to(_SlidingPuzzle.dtype)
+    state_size = tensor_size(_solved_state)
+    move_fn = LIBDSC.sliding48_multi_act
+
+class _SlidingPuzzle63(_SlidingPuzzle):
+
+    size = ctypes.c_short(8)
+
+    state_shape = torch.Size([2 + size.value ** 2])
+    state_oh_size = size.value ** 4
+    _solved_state = torch.concat((
+        torch.tensor([0, 0]), torch.arange(size.value ** 2)
+    )).to(_SlidingPuzzle.dtype)
+    state_size = tensor_size(_solved_state)
+    move_fn = LIBDSC.sliding63_multi_act
 
 
 _ENVS = {
     "cube": _CubeEnvironment,
     "sp15": _SlidingPuzzle15,
+    "sp24": _SlidingPuzzle24,
+    "sp35": _SlidingPuzzle35,
+    "sp48": _SlidingPuzzle48,
+    "sp63": _SlidingPuzzle63,
 }
 
 def get_env(env: str) -> Type[Environment]:

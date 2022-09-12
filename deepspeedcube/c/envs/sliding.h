@@ -31,7 +31,19 @@ void sliding24_multi_act(
     size_t n
 );
 
+void sliding35_multi_act(
+    short *states,
+    const action *actions,
+    size_t n
+);
+
 void sliding48_multi_act(
+    short *states,
+    const action *actions,
+    size_t n
+);
+
+void sliding63_multi_act(
     short *states,
     const action *actions,
     size_t n

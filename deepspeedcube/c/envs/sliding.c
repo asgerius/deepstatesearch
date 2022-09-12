@@ -37,7 +37,7 @@ void sliding15_multi_act(
     const action *actions,
     size_t n
 ) {
-    sliding_multi_act(states, actions, n, 15);
+    sliding_multi_act(states, actions, n, 4);
 }
 
 void sliding24_multi_act(
@@ -45,7 +45,15 @@ void sliding24_multi_act(
     const action *actions,
     size_t n
 ) {
-    sliding_multi_act(states, actions, n, 24);
+    sliding_multi_act(states, actions, n, 5);
+}
+
+void sliding35_multi_act(
+    short *states,
+    const action *actions,
+    size_t n
+) {
+    sliding_multi_act(states, actions, n, 6);
 }
 
 void sliding48_multi_act(
@@ -53,7 +61,15 @@ void sliding48_multi_act(
     const action *actions,
     size_t n
 ) {
-    sliding_multi_act(states, actions, n, 48);
+    sliding_multi_act(states, actions, n, 7);
+}
+
+void sliding63_multi_act(
+    short *states,
+    const action *actions,
+    size_t n
+) {
+    sliding_multi_act(states, actions, n, 8);
 }
 
 void sliding_neighbours_set_null_actions(
