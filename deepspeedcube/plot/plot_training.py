@@ -21,7 +21,11 @@ def plot_loss(loc: str, cfg: TrainConfig, res: TrainResults):
 
 def plot_value_estimates(loc: str, cfg: TrainConfig, res: TrainResults):
     with plots.Figure(f"{loc}/plots-train/value-estimates.png"):
-        Ks = (1, 3, 5, 7, 10, 13, 15, 17, 20, 30)
+        if cfg.env == "cube":
+            Ks = (1, 3, 5, 7, 10, 13, 15, 17, 20, 30, 40)
+        else:
+            # Generally space Ks quadratically, as log spacing is too agressive
+            Ks = np.unique((np.linspace(1, np.sqrt(cfg.K), 10) ** 2).to(int))
         for K in Ks:
             if K > cfg.K:
                 break
