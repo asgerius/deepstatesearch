@@ -170,7 +170,7 @@ class AStar(Solver):
                     ptr(actions),
                     ptr(reverse_actions),
                     ptr(final_state),
-                    LIBDSC.cube_multi_act,
+                    self.env.move_fn,
                     search_state_p,
                 )
                 actions = actions[:num_actions].flip(0)
