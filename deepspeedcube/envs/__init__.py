@@ -206,7 +206,7 @@ class _CubeEnvironment(Environment):
 class _SlidingPuzzle(Environment):
 
     size: ctypes.c_short
-    dtype = torch.int16
+    dtype = torch.int8
     action_space = torch.arange(4, dtype=torch.uint8)
 
     @classmethod

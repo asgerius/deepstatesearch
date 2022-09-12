@@ -129,7 +129,7 @@ def train(job: JobDescription):
 
         if i in eval_batches:
             TT.profile("Evaluate")
-            log("Evaluating models")
+            log("Evaluating value estimates")
             for model in models:
                 model.eval()
 

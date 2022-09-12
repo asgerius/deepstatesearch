@@ -57,7 +57,7 @@ def gen_eval_states(env: Environment, states_per_depth: int, depths: list[int]) 
     return states.view(len(depths), states_per_depth, *env.get_solved().shape)
 
 def get_batches_per_gen(env: Environment, batch_size: int) -> int:
-    max_gen_states = 250 * 10 ** 6
+    max_gen_states = 100 * 10 ** 6
 
     # Calculate memory requirements for scrambling
     state_memory           = tensor_size(env.get_solved())
@@ -75,7 +75,7 @@ def get_batches_per_gen(env: Environment, batch_size: int) -> int:
     total_batch_memory = batch_size * (scramble_memory + neighbour_memory)
     log.debug(
         "Memory requirements for generating states for a batch of size %i:" % batch_size,
-        thousands_seperators(total_batch_memory) + "B",
+        thousands_seperators(total_batch_memory // 2 ** 20) + " MB",
     )
 
     avail_mem = psutil.virtual_memory().total
