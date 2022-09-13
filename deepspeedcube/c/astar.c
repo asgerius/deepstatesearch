@@ -177,6 +177,8 @@ void astar_iteration(
             }
         }
     }
+
+    free(g_current);
 }
 
 size_t astar_longest_path(astar_search *search) {
