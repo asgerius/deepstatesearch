@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from math import ceil
 
 import psutil
@@ -38,25 +39,18 @@ def gen_new_states(env: Environment, num_states: int, K: int) -> tuple[torch.Ten
 
     return states[:num_states], scramble_depths[:num_states]
 
-def gen_eval_states(env: Environment, states_per_depth: int, depths: list[int]) -> torch.Tensor:
-    total_states = states_per_depth * len(depths)
+def gen_eval_states(env: Environment, num_states: int, min_scrambles: int, max_scrambles: int) -> tuple[torch.Tensor, list[int]]:
+    depths = [random.randint(min_scrambles, max_scrambles) for _ in range(num_states)]
 
     with TT.profile("Create states"):
-        states = env.get_multiple_solved(total_states)
+        states = env.get_multiple_solved(num_states)
 
     with TT.profile("Scramble states"):
-        for i, (prev_depth, depth) in enumerate(zip([0, *depths[:-1]], depths)):
-            start = i * states_per_depth
-            n_states = total_states - start
-            scrambles = depth - prev_depth
-            for _ in range(scrambles):
-                actions = torch.randint(
-                    0, len(env.action_space), (n_states,),
-                    dtype=torch.uint8,
-                )
-                env.multiple_moves(actions, states[start:], inplace=True)
+        for i, d in enumerate(depths):
+            for _ in range(d):
+                states[i] = env.move(random.randint(0, len(env.action_space) - 1), states[i])
 
-    return states.view(len(depths), states_per_depth, *env.get_solved().shape)
+    return states, depths
 
 def get_batches_per_gen(env: Environment, batch_size: int) -> int:
     max_gen_states = 100 * 10 ** 6

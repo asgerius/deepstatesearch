@@ -18,40 +18,44 @@ from deepspeedcube.train.train import TrainConfig
 
 @dataclass
 class EvalConfig(DataStorage, json_name="eval_cfg.json", indent=4):
-    solver:           str
-    depths:           list[int]
-    states_per_depth: int
-    max_time:         float
-    astar_lambda:     float
-    astar_n:          int
-    astar_d:          int
-    solver_name:      str
-    validate:         bool
-    fp16:             bool
+    solver:        str
+    min_scrambles: int
+    max_scrambles: int
+    depths:        list[int]
+    num_states:    int
+    max_time:      float
+    astar_lambda:  float
+    astar_n:       int
+    astar_d:       int
+    solver_name:   str
+    validate:      bool
+    fp16:          bool
 
 @dataclass
 class EvalResults(DataStorage, json_name="eval_results.json", indent=4):
-    num_solved:    list[int]
-    solved:        list[list[bool]]
-    solve_times:   list[list[float]]
-    states_seen:   list[list[int]]
-    solve_lengths: list[list[int | None]]
-    mem_usage:     list[list[int]]
+    num_solved:    int
+    solved:        list[bool]
+    solve_times:   list[float]
+    states_seen:   list[int]
+    solve_lengths: list[int | None]
+    mem_usage:     list[int]
 
 @torch.no_grad()
 def eval(job: JobDescription):
     log.section("Loading configurations")
     eval_cfg = EvalConfig(
-        solver           = job.solver,
-        depths           = list(range(job.max_depth+1)) if job.range else [job.max_depth],
-        states_per_depth = job.states_per_depth,
-        max_time         = job.max_time,
-        astar_lambda     = job.astar_lambda,
-        astar_n          = job.astar_n,
-        astar_d          = job.astar_d,
-        solver_name      = "",  # Set later
-        validate         = job.validate,
-        fp16            = job.fp16,
+        solver        = job.solver,
+        min_scrambles = job.min_scrambles,
+        max_scrambles = job.max_scrambles,
+        depths        = list(),
+        num_states    = job.num_states,
+        max_time      = job.max_time,
+        astar_lambda  = job.astar_lambda,
+        astar_n       = job.astar_n,
+        astar_d       = job.astar_d,
+        solver_name   = "",  # Set later
+        validate      = job.validate,
+        fp16          = job.fp16,
     )
     log("Got eval config", eval_cfg)
 
@@ -103,7 +107,7 @@ def eval(job: JobDescription):
     eval_cfg.solver_name = str(solver)
 
     results = EvalResults(
-        num_solved    = list(),
+        num_solved    = 0,
         solved        = list(),
         solve_times   = list(),
         states_seen   = list(),
@@ -112,71 +116,61 @@ def eval(job: JobDescription):
     )
 
     log.section("Evaluating")
-    states = gen_eval_states(env, eval_cfg.states_per_depth, eval_cfg.depths)
-    for i, depth in enumerate(eval_cfg.depths):
-        log("Evaluating at depth %i" % depth)
-        results.num_solved.append(0)
-        results.solved.append(list())
-        results.solve_times.append(list())
-        results.states_seen.append(list())
-        results.solve_lengths.append(list())
-        results.mem_usage.append(list())
+    states, eval_cfg.depths = gen_eval_states(env, eval_cfg.num_states, eval_cfg.min_scrambles, eval_cfg.max_scrambles)
+    log.debug("Evaluation depths: %s" % eval_cfg.depths)
 
-        TT.profile("Evaluate at depth %i" % depth)
+    for i, state in enumerate(states):
+        log.debug("State %i / %i" % (i + 1, eval_cfg.num_states))
+        actions, time, states_seen = solver.solve(state)
+        did_solve = actions is not None and time <= eval_cfg.max_time
+        results.num_solved += did_solve
+        results.solved.append(did_solve)
+        results.solve_times.append(time)
+        results.states_seen.append(states_seen)
+        results.solve_lengths.append(len(actions) if did_solve else -1)
+        results.mem_usage.append(psutil.Process(os.getpid()).memory_info().rss)
 
-        for j, state in enumerate(states[i]):
-            log.debug("State %i / %i" % (j + 1, eval_cfg.states_per_depth))
-            actions, time, states_seen = solver.solve(state)
-            did_solve = actions is not None and time <= eval_cfg.max_time
-            results.num_solved[-1] += did_solve
-            results.solved[-1].append(did_solve)
-            results.solve_times[-1].append(time)
-            results.states_seen[-1].append(states_seen)
-            results.solve_lengths[-1].append(len(actions) if did_solve else -1)
-            results.mem_usage[-1].append(psutil.Process(os.getpid()).memory_info().rss)
+        log.debug(
+            "Solved: %s" % did_solve,
+            "Length: %i" % len(actions),
+            "Time:   %.4f s" % time,
+            "States: %s" % thousands_seperators(states_seen),
+            "States per second: %s" % thousands_seperators(round(states_seen / time)),
+        )
 
-            log.debug(
-                "Solved: %s" % did_solve,
-                "Time:   %.4f s" % time,
-                "States: %s" % thousands_seperators(states_seen),
-                "States per second: %s" % thousands_seperators(round(states_seen / time)),
-            )
+        if did_solve and eval_cfg.validate:
+            TT.profile("Validate")
+            new_state = state
+            for action in actions:
+                new_state = env.move(action, new_state)
+            if not env.is_solved(new_state):
+                log.error(
+                    "State %s was not solved" % state,
+                    "Actions:     %s" % actions,
+                    "Final state: %s" % new_state,
+                )
+                raise RuntimeError("Failed to solve state")
+            TT.end_profile()
 
-            if did_solve and eval_cfg.validate:
-                TT.profile("Validate")
-                new_state = state
-                for action in actions:
-                    new_state = env.move(action, new_state)
-                if not env.is_solved(new_state):
-                    log.error(
-                        "State %s was not solved" % state,
-                        "Actions:     %s" % actions,
-                        "Final state: %s" % new_state,
-                    )
-                    raise RuntimeError("Failed to solve state")
-                TT.end_profile()
-
-        log.debug("Solved %i / %i = %.0f %%" % (
-            results.num_solved[-1],
-            eval_cfg.states_per_depth,
-            100 * results.num_solved[-1] / eval_cfg.states_per_depth,
-        ))
-        solved_states = torch.BoolTensor(results.solved[-1])
-        if solved_states.any():
-            # Log statistics for solved states
-            solve_times = torch.FloatTensor(results.solve_times[-1])[solved_states]
-            states_seen = torch.FloatTensor(results.states_seen[-1])[solved_states]
-            solve_lengths = torch.FloatTensor(results.solve_lengths[-1])[solved_states]
-            log.debug(
-                "For the solved states:",
-                "Avg. solution time:    %.2f ms" % (1000 * solve_times.mean()),
-                "Avg. states seen:      %s" % thousands_seperators(round(states_seen.mean().item())),
-                "Avg. nodes per second: %s" % thousands_seperators(round(states_seen.mean().item() / solve_times.mean().item())),
-                "Avg. solution length:  %.2f" % solve_lengths.mean(),
-                sep="\n    ",
-            )
-
-        TT.end_profile()
+    log.debug("Solved %i / %i = %.0f %%" % (
+        results.num_solved,
+        eval_cfg.num_states,
+        100 * results.num_solved / eval_cfg.num_states,
+    ))
+    solved_states = torch.BoolTensor(results.solved)
+    if solved_states.any():
+        # Log statistics for solved states
+        solve_times = torch.FloatTensor(results.solve_times)[solved_states]
+        states_seen = torch.FloatTensor(results.states_seen)[solved_states]
+        solve_lengths = torch.FloatTensor(results.solve_lengths)[solved_states]
+        log.debug(
+            "For the solved states:",
+            "Avg. solution time:    %.2f ms" % (1000 * solve_times.mean()),
+            "Avg. states seen:      %s" % thousands_seperators(round(states_seen.mean().item())),
+            "Avg. nodes per second: %s" % thousands_seperators(round(states_seen.mean().item() / solve_times.mean().item())),
+            "Avg. solution length:  %.2f" % solve_lengths.mean(),
+            sep="\n    ",
+        )
 
     log.section("Saving")
     eval_cfg.save(job.location)

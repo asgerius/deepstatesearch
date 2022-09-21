@@ -10,35 +10,10 @@ from pelutils import log
 from deepspeedcube.eval.eval import EvalConfig, EvalResults
 
 
-
-def plot_solve_pct(loc: str, cfg: EvalConfig, res: EvalResults):
-    solved_frac = np.array(res.solved).mean(axis=1)
-
-    with plots.Figure(f"{loc}/plots-eval/solve-pct.png"):
-        plt.figure().gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-        plt.plot(cfg.depths, 100 * solved_frac, "--o")
-        plt.title("Solve pct. for %s" % cfg.solver_name)
-        plt.xlabel("Scrambles")
-        plt.ylabel("Solved [%]")
-        plt.ylim([-7, 107])
-        plt.grid()
-
-def plot_solve_pct_all(loc: str, cfgs: list[EvalConfig], ress: list[EvalResults]):
-    with plots.Figure(f"{loc}/plots-eval/solve-pct.png"):
-        plt.figure().gca().xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-        for cfg, res in zip(cfgs, ress):
-            solved_frac = np.array(res.solved).mean(axis=1)
-            plt.plot(cfg.depths, 100 * solved_frac, "--o", label=cfg.solver_name)
-        plt.legend()
-        plt.xlabel("Scrambles")
-        plt.ylabel("Solved [%]")
-        plt.ylim([-7, 107])
-        plt.grid()
-
 def plot_solve_rate_time(loc: str, cfg: EvalConfig, res: EvalResults):
     with plots.Figure(f"{loc}/plots-eval/solve-rate-time.png"):
-        solved = np.array(res.solved)[-1]
-        solve_times = np.array(res.solve_times)[-1, solved]
+        solved = np.array(res.solved)
+        solve_times = np.array(res.solve_times)[solved]
         solve_times = np.sort(solve_times)
         solved_frac = np.linspace(0, solved.mean(), 1 + len(solve_times))[1:]
 
@@ -53,8 +28,8 @@ def plot_solve_rate_time(loc: str, cfg: EvalConfig, res: EvalResults):
 
 def plot_solve_states_seen(loc: str, cfg: EvalConfig, res: EvalResults):
     with plots.Figure(f"{loc}/plots-eval/solve-rate-states.png"):
-        solved = np.array(res.solved)[-1]
-        states_seen = np.array(res.states_seen)[-1, solved]
+        solved = np.array(res.solved)
+        states_seen = np.array(res.states_seen)[solved]
         states_seen = np.sort(states_seen)
         solved_frac = np.linspace(0, solved.mean(), 1 + len(states_seen))[1:]
 
@@ -69,9 +44,9 @@ def plot_solve_states_seen(loc: str, cfg: EvalConfig, res: EvalResults):
 
 def plot_states_seen(loc: str, cfg: EvalConfig, res: EvalResults):
     with plots.Figure(f"{loc}/plots-eval/states-seen.png"):
-        solved = np.array(res.solved[-1])
-        solve_times = np.array(res.solve_times)[-1]
-        states_seen = np.array(res.states_seen)[-1]
+        solved = np.array(res.solved)
+        solve_times = np.array(res.solve_times)
+        states_seen = np.array(res.states_seen)
 
         for did_solve in True, False:
             plt.scatter(solve_times[solved==did_solve], states_seen[solved==did_solve], label="Solved" if did_solve else "Not solved")
@@ -111,11 +86,7 @@ if __name__ == "__main__":
         configs.append(cfg)
         results.append(res)
 
-        plot_solve_pct(loc, cfg, res)
         plot_solve_rate_time(loc, cfg, res)
         plot_solve_states_seen(loc, cfg, res)
         plot_states_seen(loc, cfg, res)
         plot_memory_usage(loc, cfg, res)
-
-    log("Plotting combined")
-    plot_solve_pct_all(args.location, configs, results)
