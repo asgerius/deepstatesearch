@@ -243,7 +243,6 @@ def train(job: JobDescription):
             with TT.profile("Train model"), amp.autocast() if train_cfg.fp16 else contextlib.ExitStack():
                 preds = model(states_oh).squeeze()
                 loss = criterion(preds, targets)
-                # breakpoint()
                 if train_cfg.fp16:
                     scalers[j].scale(loss).backward()
                     scalers[j].step(optimizer)
