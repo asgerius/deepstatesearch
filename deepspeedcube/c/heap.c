@@ -1,5 +1,4 @@
 #include "heap.h"
-#include <stdio.h>
 
 
 heap *heap_alloc(size_t d, size_t element_size) {

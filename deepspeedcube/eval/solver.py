@@ -112,7 +112,7 @@ class AStar(Solver):
             frontier_p = ctypes.c_void_p(LIBDSC.astar_frontier_ptr(search_state_p))
 
         # Insert initial state into frontier and node map
-        h = self.h(state.unsqueeze(0))[0].item()
+        h = self.h(state.unsqueeze(0).to(device))[0].item()
 
         with TT.profile("Add initial state"):
             LIBDSC.astar_add_initial_state(h, ptr(state), search_state_p)
@@ -127,6 +127,8 @@ class AStar(Solver):
                 _, current_states = self.extract_min(frontier_p)
             with TT.profile("Get neighbours"):
                 _, neighbour_states = self.env.neighbours(current_states)
+            with TT.profile("To device"):
+                neighbour_states_d = neighbour_states.to(device)
 
             # Make sure there is enough space in the heap, as astar_iteration
             # usually adds new states without allocating more memory
@@ -135,7 +137,7 @@ class AStar(Solver):
                     LIBDSC.heap_increase_alloc(frontier_p)
 
             with TT.profile("Check for solution"):
-                any_solved = self.env.multiple_is_solved(neighbour_states).any()
+                any_solved = self.env.multiple_is_solved_d(neighbour_states_d).any()
             if any_solved:
                 with TT.profile("Solve cleanup"):
                     longest_path = LIBDSC.astar_longest_path(search_state_p) + 1
@@ -147,7 +149,7 @@ class AStar(Solver):
                 TT.end_profile()
                 break
 
-            h = self.h(neighbour_states)
+            h = self.h(neighbour_states_d)
 
             with TT.profile("Update search state"):
                 LIBDSC.astar_iteration(
@@ -195,17 +197,15 @@ class AStar(Solver):
         return keys_arr[:num_extracted], data_arr[:num_extracted]
 
     @torch.no_grad()
-    def h(self, states: torch.Tensor) -> torch.Tensor:
+    def h(self, states_d: torch.Tensor) -> torch.Tensor:
         """ Calculates the average h produced by the models multiplied by lambda. """
 
-        with TT.profile("To device"):
-            states_d = states.to(device)
         with TT.profile("One-hot"):
             states_oh = self.env.multiple_oh(states_d)
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
 
-        preds = torch.zeros(len(states), dtype=torch.float, device=device)
+        preds = torch.zeros(len(states_d), dtype=torch.float, device=device)
         with TT.profile("Estimate cost-to-go"), \
             amp.autocast() if self.fp16 and torch.cuda.is_available() else contextlib.ExitStack():
             for model in self.models:

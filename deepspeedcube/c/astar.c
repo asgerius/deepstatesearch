@@ -1,5 +1,6 @@
 #include "astar.h"
 
+
 uint64_t hash_node(const void *elem, uint64_t seed0, uint64_t seed1) {
     const node *node = elem;
     return hashmap_murmur(node->state, node->state_size, seed0, seed1);
