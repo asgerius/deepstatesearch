@@ -16,7 +16,7 @@ options = (
     Option("max-time",         default=1, type=float),
     Option("astar-lambda",     default=1, type=float),
     Option("astar-n",          default=100),
-    Option("astar-d",          default=1),
+    Option("astar-d",          default=2),
     Flag("validate"),
     Flag("range"),
     Flag("fp16"),

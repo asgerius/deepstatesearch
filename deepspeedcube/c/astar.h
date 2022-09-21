@@ -37,6 +37,7 @@ typedef struct astar_search astar_search;
 
 astar_search *astar_init(
     float lambda,
+    size_t heap_d,
     size_t state_size
 );
 

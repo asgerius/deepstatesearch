@@ -87,7 +87,7 @@ class AStar(Solver):
         self.fp16 = fp16
         self.l = l  # lambda used to weigh moves spent and estimated cost-to-go
         self.N = N  # Number of states to expand each iteration
-        self.d = d  # Depth expansion
+        self.d = d  # Parameter for the d-ary heap
 
         for model in self.models:
             model.eval()
@@ -106,7 +106,8 @@ class AStar(Solver):
         with TT.profile("Allocate"):
             search_state_p = ctypes.c_void_p(LIBDSC.astar_init(
                 ctypes.c_float(self.l),
-                ctypes.c_size_t(tensor_size(state))
+                ctypes.c_size_t(self.d),
+                ctypes.c_size_t(tensor_size(state)),
             ))
             frontier_p = ctypes.c_void_p(LIBDSC.astar_frontier_ptr(search_state_p))
 
@@ -215,4 +216,4 @@ class AStar(Solver):
         return preds.cpu() / len(self.models)
 
     def __str__(self) -> str:
-        return f"$A^*(\lambda={self.l}, N={self.N})$"
+        return f"$A^*(\lambda={self.l}, N={self.N}, d={self.d})$"

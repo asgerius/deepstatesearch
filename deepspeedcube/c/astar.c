@@ -45,13 +45,14 @@ void astar_new_state_array(astar_search *search, bool is_first) {
 
 astar_search *astar_init(
     float lambda,
+    size_t heap_d,
     size_t state_size
 ) {
     astar_search *search = malloc(sizeof(astar_search));
-    search->    lambda = lambda;
+    search->lambda = lambda;
     search->longest_path = 0;
     search->state_size = state_size;
-    search->frontier = heap_alloc(state_size);
+    search->frontier = heap_alloc(heap_d, state_size);
     search->node_map = hashmap_new(sizeof(node), 0, 0, 0, hash_node, compare_nodes, NULL, NULL);
 
     astar_new_state_array(search, true);

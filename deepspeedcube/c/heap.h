@@ -8,9 +8,8 @@
 #include "envs/envs.h"
 
 #define HEAP_BASE_SIZE 20000
-#define HEAP_PARENT(x) ((x) / 2)
-#define HEAP_LEFT(x) (2 * (x))
-#define HEAP_RIGHT(x) (2 * (x) + 1)
+#define HEAP_PARENT(x, d) (((x) - 1) / (d))
+#define HEAP_LEFTMOST_CHILD(x, d) ((d) * (x) + 1)
 #define EITHER_OR(cond, x, y) ((cond) * (x) + (!(cond)) * (y))
 
 
@@ -21,12 +20,13 @@ struct heap_entry {
 
 typedef struct heap_entry heap_entry;
 
+/* d-ary heap. See https://en.wikipedia.org/wiki/D-ary_heap */
 struct heap {
     heap_entry *entries;
+    size_t d;
     size_t element_size;
-    // Number of elements (including null element) in the heap
-    // This will always be less than or equal to the number of elements
-    // that memory has been allocated for
+    /* Number of elements in the heap. This will always be less than or
+    equal to the number of elements that has been allocated memory for. */
     size_t num_elems;
     size_t num_alloc;
 };
@@ -34,7 +34,7 @@ struct heap {
 typedef struct heap heap;
 
 /* Allocates room for an empty heap. */
-heap *heap_alloc(size_t element_size);
+heap *heap_alloc(size_t d, size_t element_size);
 
 /* Frees the heap. The arrays are owned by numpy/torch, so they are not freed here. */
 void heap_free(heap *heap_p);

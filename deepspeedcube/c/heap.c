@@ -1,11 +1,13 @@
 #include "heap.h"
+#include <stdio.h>
 
 
-heap *heap_alloc(size_t element_size) {
+heap *heap_alloc(size_t d, size_t element_size) {
     heap *heap_p = malloc(sizeof(*heap_p));
     heap_p->entries = malloc(HEAP_BASE_SIZE * sizeof(heap_entry));
+    heap_p->d = d;
     heap_p->element_size = element_size;
-    heap_p->num_elems = 1;
+    heap_p->num_elems = 0;
     heap_p->num_alloc = HEAP_BASE_SIZE;
 
     return heap_p;
@@ -35,93 +37,75 @@ void heap_increase_alloc(heap *heap_p) {
 }
 
 void bubble_up(heap *heap_p, size_t index) {
-    if (index == 1) {
+    if (index == 0) {
         return;
     }
 
-    size_t index_parent = HEAP_PARENT(index);
+    size_t index_parent = HEAP_PARENT(index, heap_p->d);
 
     float key_node = heap_p->entries[index].key;
     float key_parent = heap_p->entries[index_parent].key;
 
-    while (key_node < key_parent && index > 1) {
+    if (key_parent > key_node) {
         // Heap order violated, so swap elements
         heap_entry entry_tmp = heap_p->entries[index];
         heap_p->entries[index] = heap_p->entries[index_parent];
         heap_p->entries[index_parent] = entry_tmp;
 
-        index = index_parent;
-        index_parent = HEAP_PARENT(index);
-
-        key_node = heap_p->entries[index].key;
-        key_parent = heap_p->entries[index_parent].key;
+        bubble_up(heap_p, index_parent);
     }
 }
 
 void bubble_down(heap *heap_p, size_t index) {
 
-    size_t index_left = HEAP_LEFT(index);
-    size_t index_right = HEAP_RIGHT(index);
-
-    if (index_left > heap_p->num_elems) {
+    size_t index_start_child = HEAP_LEFTMOST_CHILD(index, heap_p->d);
+    if (index_start_child >= heap_p->num_elems) {
         // No children, so stop here
         return;
     }
-    // Only the left child exist, so make both children the same to
-    // make all following logic work without the need for exceptions
-    index_right = EITHER_OR(index_right > heap_p->num_elems, index_left, index_right);
 
     float key_node = heap_p->entries[index].key;
-    float key_left = heap_p->entries[index_left].key;
-    float key_right = heap_p->entries[index_right].key;
 
-    bool key_left_smaller = key_left < key_right;
-    float key_child = EITHER_OR(key_left_smaller, key_left, key_right);
-    size_t index_child = EITHER_OR(key_left_smaller, index_left, index_right);
+    size_t index_lowest_child = index_start_child;
+    float key_lowest_child = heap_p->entries[index_lowest_child].key;
 
-    while (key_node > key_child && index < heap_p->num_elems - 1) {
+    #pragma unroll
+    for (size_t i = 1; i < heap_p->d; ++ i) {
+        size_t index_child = index_start_child + i;
+        index_child = EITHER_OR(index_child < heap_p->num_elems, index_child, heap_p->num_elems - 1);
+        float key_child = heap_p->entries[index_child].key;
+        bool new_smallest = key_child < key_lowest_child;
+        key_lowest_child = EITHER_OR(new_smallest, key_child, key_lowest_child);
+        index_lowest_child = EITHER_OR(new_smallest, index_child, index_lowest_child);
+    }
+
+    if (key_node > key_lowest_child) {
         // Heap order violated, so swap elements
         heap_entry entry_tmp = heap_p->entries[index];
-        heap_p->entries[index] = heap_p->entries[index_child];
-        heap_p->entries[index_child] = entry_tmp;
+        heap_p->entries[index] = heap_p->entries[index_lowest_child];
+        heap_p->entries[index_lowest_child] = entry_tmp;
 
-        index = index_child;
-        index_left = HEAP_LEFT(index);
-        index_right = HEAP_RIGHT(index);
-
-        if (index_left > heap_p->num_elems) {
-            // No children, so stop here
-            return;
-        }
-        index_right = EITHER_OR(index_right > heap_p->num_elems, index_left, index_right);
-
-        key_node = heap_p->entries[index].key;
-        key_left = heap_p->entries[index_left].key;
-        key_right = heap_p->entries[index_right].key;
-
-        key_left_smaller = key_left < key_right;
-        key_child = EITHER_OR(key_left_smaller, key_left, key_right);
-        index_child = EITHER_OR(key_left_smaller, index_left, index_right);
+        bubble_down(heap_p, index_lowest_child);
     }
 }
 
 size_t heap_extract_min(heap *heap_p, size_t n, float *keys, void *data) {
     // Extracts up to n elements from the heap
     // Returns the exact number of elements extracted
-    n = MIN(n, heap_p->num_elems - 1);
+    n = MIN(n, heap_p->num_elems);
 
     for (size_t i = 0; i < n; ++ i) {
         // Copy key and data to out arrays
         void *data_out = data + i * heap_p->element_size;
-        memcpy(data_out, heap_p->entries[1].data, heap_p->element_size);
+        memcpy(data_out, heap_p->entries[0].data, heap_p->element_size);
 
-        // Set first element to element after the last and update heap order
+        // Swap first and last elements and update heap order
         -- heap_p->num_elems;
-        heap_entry entry_tmp = heap_p->entries[1];
-        heap_p->entries[1] = heap_p->entries[heap_p->num_elems];
+        heap_entry entry_tmp = heap_p->entries[0];
+        heap_p->entries[0] = heap_p->entries[heap_p->num_elems];
         heap_p->entries[heap_p->num_elems] = entry_tmp;
 
-        bubble_down(heap_p, 1);
+        bubble_down(heap_p, 0);
     }
 
     return n;
