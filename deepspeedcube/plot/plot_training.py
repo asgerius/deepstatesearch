@@ -25,7 +25,7 @@ def plot_value_estimates(loc: str, cfg: TrainConfig, res: TrainResults):
             Ks = (1, 3, 5, 7, 10, 13, 15, 17, 20, 30, 40)
         else:
             # Generally space Ks quadratically, as log spacing is too agressive
-            Ks = np.unique((np.linspace(1, np.sqrt(cfg.K), 10) ** 2).to(int))
+            Ks = np.unique((np.linspace(1, np.sqrt(cfg.K), 10) ** 2).astype(int))
         for K in Ks:
             if K > cfg.K:
                 break

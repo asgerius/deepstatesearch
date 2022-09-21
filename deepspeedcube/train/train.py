@@ -220,14 +220,19 @@ def train(job: JobDescription):
                     torch.cuda.synchronize()
 
             with TT.profile("Set solved states to j = 0"):
-                solved_states = env.multiple_is_solved(neighbour_states)
+                solved_states = env.multiple_is_solved_d(neighbour_states_d)
                 J[solved_states] = 0
             J = J.view(len(states_d), len(env.action_space))
 
             with TT.profile("Calculate targets"):
-                g = (to_neighbour_actions_d != NULL_ACTION) \
+                # Set g to 1 for valid moves and effectively inf for invalid moves.
+                # Effectively the same as not including the moves, but allows
+                # for better and easier vectorization.
+                # Note: Do not use torch.inf, as 0 * torch.inf is nan.
+                g = (to_neighbour_actions_d == NULL_ACTION) \
                     .to(torch.float) \
                     .view(len(states_d), len(env.action_space))
+                g = g * 1e10 + 1
                 targets = torch.min(g + J, dim=1).values
             TT.end_profile()
 
@@ -238,6 +243,7 @@ def train(job: JobDescription):
             with TT.profile("Train model"), amp.autocast() if train_cfg.fp16 else contextlib.ExitStack():
                 preds = model(states_oh).squeeze()
                 loss = criterion(preds, targets)
+                # breakpoint()
                 if train_cfg.fp16:
                     scalers[j].scale(loss).backward()
                     scalers[j].step(optimizer)
@@ -278,7 +284,7 @@ def train(job: JobDescription):
             scheduler.step()
 
             if i % train_cfg.tau_every == 0 and train_results.losses[j][-1] < train_cfg.epsilon:
-                log.debug("Updating generator network")
+                log("Updating generator network")
                 with TT.profile("Update generator network"):
                     update_generator_network(train_cfg.tau, gen_models[j], models[j])
 

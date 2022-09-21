@@ -6,12 +6,11 @@ import psutil
 import torch
 from pelutils import TT, log, thousands_seperators
 
-from deepspeedcube import tensor_size
+from deepspeedcube import device, tensor_size
 from deepspeedcube.envs import Environment
 
 
 def gen_new_states(env: Environment, num_states: int, K: int) -> tuple[torch.Tensor, torch.Tensor]:
-    K += 1  # Should be inclusive
     states_per_depth = ceil(num_states / K)
 
     with TT.profile("Create states"):
@@ -22,15 +21,18 @@ def gen_new_states(env: Environment, num_states: int, K: int) -> tuple[torch.Ten
         for i in range(K):
             start = i * states_per_depth
             n = len(states) - start
-            actions = torch.randint(
-                0, len(env.action_space), (n,),
-                dtype=torch.uint8,
-            )
-            env.multiple_moves(actions, states[start:], inplace=True)
+            with TT.profile("Generate actions"):
+                actions = torch.randint(
+                    0, len(env.action_space), (n,),
+                    dtype=torch.uint8,
+                    device=device,
+                ).cpu()
+            with TT.profile("Perform actions"):
+                env.multiple_moves(actions, states[start:], inplace=True)
             scramble_depths[start:] += 1
 
     with TT.profile("Shuffle states"):
-        shuffle_index = torch.randperm(len(states))
+        shuffle_index = torch.randperm(len(states), device=device).cpu()
         states[:] = states[shuffle_index]
         scramble_depths[:] = scramble_depths[shuffle_index]
 

@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from deepspeedcube import ptr, tensor_size, LIBDSC
+from deepspeedcube import device, ptr, tensor_size, LIBDSC
 
 
 NULL_ACTION = 255
@@ -20,6 +20,7 @@ class Environment(abc.ABC):
     state_shape: torch.Size
     state_oh_size: int
     _solved_state: torch.Tensor
+    _solved_state_d: torch.Tensor
     state_size: int
     move_fn: ctypes._NamedFuncPointer
 
@@ -38,6 +39,10 @@ class Environment(abc.ABC):
     @classmethod
     def multiple_is_solved(cls, states: torch.Tensor) -> torch.BoolTensor:
         return (states == cls._solved_state).all(dim=1)
+
+    @classmethod
+    def multiple_is_solved_d(cls, states_d: torch.Tensor) -> torch.BoolTensor:
+        return (states_d == cls._solved_state_d).all(dim=1)
 
     @abc.abstractclassmethod
     def move(cls, action: int, state: torch.Tensor) -> torch.Tensor:
@@ -91,6 +96,7 @@ class _CubeEnvironment(Environment):
          0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22],
         dtype=dtype,
     )
+    _solved_state_d = _solved_state.to(device)
     state_size = tensor_size(_solved_state)
     move_fn = LIBDSC.cube_multi_act
 
@@ -289,6 +295,7 @@ class _SlidingPuzzle15(_SlidingPuzzle):
     _solved_state = torch.concat((
         torch.tensor([0, 0]), torch.arange(size.value ** 2)
     )).to(_SlidingPuzzle.dtype)
+    _solved_state_d = _solved_state.to(device)
     state_size = tensor_size(_solved_state)
     move_fn = LIBDSC.sliding15_multi_act
 
@@ -301,6 +308,7 @@ class _SlidingPuzzle24(_SlidingPuzzle):
     _solved_state = torch.concat((
         torch.tensor([0, 0]), torch.arange(size.value ** 2)
     )).to(_SlidingPuzzle.dtype)
+    _solved_state_d = _solved_state.to(device)
     state_size = tensor_size(_solved_state)
     move_fn = LIBDSC.sliding24_multi_act
 
@@ -313,6 +321,7 @@ class _SlidingPuzzle35(_SlidingPuzzle):
     _solved_state = torch.concat((
         torch.tensor([0, 0]), torch.arange(size.value ** 2)
     )).to(_SlidingPuzzle.dtype)
+    _solved_state_d = _solved_state.to(device)
     state_size = tensor_size(_solved_state)
     move_fn = LIBDSC.sliding35_multi_act
 
@@ -325,6 +334,7 @@ class _SlidingPuzzle48(_SlidingPuzzle):
     _solved_state = torch.concat((
         torch.tensor([0, 0]), torch.arange(size.value ** 2)
     )).to(_SlidingPuzzle.dtype)
+    _solved_state_d = _solved_state.to(device)
     state_size = tensor_size(_solved_state)
     move_fn = LIBDSC.sliding48_multi_act
 
@@ -337,6 +347,7 @@ class _SlidingPuzzle63(_SlidingPuzzle):
     _solved_state = torch.concat((
         torch.tensor([0, 0]), torch.arange(size.value ** 2)
     )).to(_SlidingPuzzle.dtype)
+    _solved_state_d = _solved_state.to(device)
     state_size = tensor_size(_solved_state)
     move_fn = LIBDSC.sliding63_multi_act
 
