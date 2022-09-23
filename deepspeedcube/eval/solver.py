@@ -93,7 +93,7 @@ class AStar(Solver):
             model.eval()
 
     @torch.no_grad()
-    def solve(self, state: torch.Tensor) -> tuple[torch.Tensor | None, float | None]:
+    def solve(self, state: torch.Tensor) -> tuple[torch.Tensor | None, float, int]:
         self.tt.tick()
 
         state = state.clone()

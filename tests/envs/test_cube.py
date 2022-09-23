@@ -25,7 +25,7 @@ def test_reverse_move():
     for _ in range(10):
         state = torch.randint(0, 24, (20,), dtype=torch.uint8)
         orig_state = state.clone()
-        actions = [random.choice(env.action_space) for _ in range(100)]
+        actions = [random.choice(env.action_space).item() for _ in range(100)]
         reverse_actions = [env.reverse_move(action) for action in actions][::-1]
         for action in actions:
             state = env.move(action, state)
@@ -45,7 +45,7 @@ def test_move():
     # Specific test case that moves are correct
     state = env.get_solved()
     for action in env.action_space:
-        state = env.move(action, state)
+        state = env.move(action.item(), state)
     # Test that stringify and by extension _as633 works on solved state
     state = env.get_solved()
     assert env.string(state) == "\n".join([
@@ -104,7 +104,7 @@ def test_move():
 def test_multiple_moves():
     states = torch.vstack([env.get_solved()]*len(env.action_space))
     for i, action in enumerate(env.action_space):
-        states[i] = env.move(action, states[i])
+        states[i] = env.move(action.item(), states[i])
 
     states2 = torch.vstack([env.get_solved()]*len(env.action_space))
     states2 = env.multiple_moves(env.action_space, states2)

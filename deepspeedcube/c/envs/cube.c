@@ -31,6 +31,22 @@ const char smaps[12][24] = {  // Sides
     {0, 1, 2, 3, 4, 5, 12, 13, 8, 9, 10, 11, 22, 23, 6, 7, 16, 17, 18, 19, 20, 21, 14, 15}
 };
 
+void cube_act(face *state, action action) {
+
+    // Slightly faster by only looking up maps once
+    const char *restrict cmap = cmaps[action];
+    const char *restrict smap = smaps[action];
+    char j;
+    // Map corners
+    for (j = 0; j < 8; ++ j) {
+        state[j] = cmap[state[j]];
+    }
+    // Map sides
+    for (j = 8; j < 20; ++ j) {
+        state[j] = smap[state[j]];
+    }
+}
+
 void cube_multi_act(face *states, const action *actions, size_t n) {
     // Performs n actions on n states in-place
     #pragma omp parallel for

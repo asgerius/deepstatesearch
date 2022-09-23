@@ -10,14 +10,15 @@ from deepspeedcube.eval.eval import eval
 
 
 options = (
-    Option("min-scrambles",    default=1000, type=int),
-    Option("max-scrambles",    default=10000, type=int),
-    Option("num-states",       default=100, type=int),
-    Option("solver",           default="AStar"),
-    Option("max-time",         default=1, type=float),
-    Option("astar-lambda",     default=1, type=float),
-    Option("astar-n",          default=100),
-    Option("astar-d",          default=2),
+    Option("min-scrambles",  default=1000, type=int),
+    Option("max-scrambles",  default=10000, type=int),
+    Option("num-states",     default=100, type=int),
+    Option("cube-data-file", default=None, type=str, help="Path to file with scrambles. Overrides min-scrambles, max-scrambles, and num-states."),
+    Option("solver",         default="AStar"),
+    Option("max-time",       default=1, type=float),
+    Option("astar-lambda",   default=1, type=float),
+    Option("astar-n",        default=100),
+    Option("astar-d",        default=2),
     Flag("validate"),
     Flag("fp16"),
 )

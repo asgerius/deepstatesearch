@@ -1,15 +1,34 @@
 #include "sliding.h"
 
 
-const action all_actions[4] = { 0, 1, 2, 3 };
+sp_dtype state_elems(const sp_dtype *state) {
+    sp_dtype size = state[2];
+    return size * size + 3;
+}
+
+void sliding_act(sp_dtype *state, action action) {
+    sp_dtype y = state[0], x = state[1];
+
+    sp_dtype y_new = y + (action - 2) * (action % 2);
+    sp_dtype x_new = x - (action - 1) * ((action + 1) % 2);
+
+    state[0] = MAX(MIN(y_new, state[2] - 1), 0);
+    state[1] = MAX(MIN(x_new, state[2] - 1), 0);
+
+    sp_dtype index_old = 3 + y * state[2] + x;
+    sp_dtype index_new = 3 + state[0] * state[2] + state[1];
+
+    sp_dtype tmp = state[index_old];
+    state[index_old] = state[index_new];
+    state[index_new] = tmp;
+}
 
 void sliding_multi_act(
     sp_dtype *states,
     const action *actions,
-    size_t n,
-    sp_dtype size
+    size_t n
 ) {
-    size_t elems_per_state = ELEMS_PER_STATE(size);
+    sp_dtype elems_per_state = state_elems(states);
 
     #pragma omp parallel for
     for (size_t i = 0; i < n; ++ i) {
@@ -20,11 +39,11 @@ void sliding_multi_act(
         sp_dtype y_new = y + (mov - 2) * (mov % 2);
         sp_dtype x_new = x - (mov - 1) * ((mov + 1) % 2);
 
-        state[0] = MAX(MIN(y_new, size-1), 0);
-        state[1] = MAX(MIN(x_new, size-1), 0);
+        state[0] = MAX(MIN(y_new, states[2] - 1), 0);
+        state[1] = MAX(MIN(x_new, states[2] - 1), 0);
 
-        sp_dtype index_old = 2 + y * size + x;
-        sp_dtype index_new = 2 + state[0] * size + state[1];
+        sp_dtype index_old = 3 + y * state[2] + x;
+        sp_dtype index_new = 3 + state[0] * state[2] + state[1];
 
         sp_dtype tmp = state[index_old];
         state[index_old] = state[index_new];
@@ -32,54 +51,13 @@ void sliding_multi_act(
     }
 }
 
-void sliding15_multi_act(
-    sp_dtype *states,
-    const action *actions,
-    size_t n
-) {
-    sliding_multi_act(states, actions, n, 4);
-}
-
-void sliding24_multi_act(
-    sp_dtype *states,
-    const action *actions,
-    size_t n
-) {
-    sliding_multi_act(states, actions, n, 5);
-}
-
-void sliding35_multi_act(
-    sp_dtype *states,
-    const action *actions,
-    size_t n
-) {
-    sliding_multi_act(states, actions, n, 6);
-}
-
-void sliding48_multi_act(
-    sp_dtype *states,
-    const action *actions,
-    size_t n
-) {
-    sliding_multi_act(states, actions, n, 7);
-}
-
-void sliding63_multi_act(
-    sp_dtype *states,
-    const action *actions,
-    size_t n
-) {
-    sliding_multi_act(states, actions, n, 8);
-}
-
 void sliding_neighbours_set_null_actions(
     const sp_dtype *states,
     const sp_dtype *neighbours,
     action *actions,
-    size_t n,
-    sp_dtype size
+    size_t n
 ) {
-    size_t elems_per_state = ELEMS_PER_STATE(size);
+    sp_dtype elems_per_state = state_elems(states);
 
     #pragma omp parallel for
     for (size_t i = 0; i < n; ++ i) {

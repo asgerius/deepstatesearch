@@ -192,7 +192,7 @@ size_t astar_retrace_path(
     action *actions,  // Actions to solve the initial state go here (in reverse order)
     action *reverse_actions,  // index i gives the reverse of action i
     void *final_state,  // Final state seen that expands to solved state
-    void (act)(void *state, void *action, size_t num_actions),
+    void (act)(void *state, action action),
     astar_search *search
 ) {
     node tmp_node = {
@@ -212,7 +212,7 @@ size_t astar_retrace_path(
 
         // At this point, we can fuck up the states, so never mind inplace movements
         action reverse_action = reverse_actions[current_node->arrival_action];
-        act(current_node->state, &reverse_action, 1);
+        act(current_node->state, reverse_action);
         current_node = hashmap_get(search->node_map, current_node);
 
         ++ i;

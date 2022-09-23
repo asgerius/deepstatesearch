@@ -11,6 +11,7 @@ from pelutils.parser import JobDescription
 from deepspeedcube import device
 from deepspeedcube.envs import get_env
 from deepspeedcube.envs.gen_states import gen_eval_states
+from deepspeedcube.eval.load_hard_cube_states import load_cube_eval_states
 from deepspeedcube.eval.solver import AStar, GreedyValueSolver
 from deepspeedcube.model import ModelConfig, Model
 from deepspeedcube.train.train import TrainConfig
@@ -18,18 +19,19 @@ from deepspeedcube.train.train import TrainConfig
 
 @dataclass
 class EvalConfig(DataStorage, json_name="eval_cfg.json", indent=4):
-    solver:        str
-    min_scrambles: int
-    max_scrambles: int
-    depths:        list[int]
-    num_states:    int
-    max_time:      float
-    astar_lambda:  float
-    astar_n:       int
-    astar_d:       int
-    solver_name:   str
-    validate:      bool
-    fp16:          bool
+    solver:         str
+    min_scrambles:  int
+    max_scrambles:  int
+    depths:         list[int]
+    cube_data_file: str | None
+    num_states:     int
+    max_time:       float
+    astar_lambda:   float
+    astar_n:        int
+    astar_d:        int
+    solver_name:    str
+    validate:       bool
+    fp16:           bool
 
 @dataclass
 class EvalResults(DataStorage, json_name="eval_results.json", indent=4):
@@ -44,18 +46,19 @@ class EvalResults(DataStorage, json_name="eval_results.json", indent=4):
 def eval(job: JobDescription):
     log.section("Loading configurations")
     eval_cfg = EvalConfig(
-        solver        = job.solver,
-        min_scrambles = job.min_scrambles,
-        max_scrambles = job.max_scrambles,
-        depths        = list(),
-        num_states    = job.num_states,
-        max_time      = job.max_time,
-        astar_lambda  = job.astar_lambda,
-        astar_n       = job.astar_n,
-        astar_d       = job.astar_d,
-        solver_name   = "",  # Set later
-        validate      = job.validate,
-        fp16          = job.fp16,
+        solver         = job.solver,
+        min_scrambles  = job.min_scrambles,
+        max_scrambles  = job.max_scrambles,
+        depths         = list(),
+        cube_data_file = job.cube_data_file,
+        num_states     = job.num_states,
+        max_time       = job.max_time,
+        astar_lambda   = job.astar_lambda,
+        astar_n        = job.astar_n,
+        astar_d        = job.astar_d,
+        solver_name    = "",  # Set later
+        validate       = job.validate,
+        fp16           = job.fp16,
     )
     log("Got eval config", eval_cfg)
 
@@ -71,7 +74,7 @@ def eval(job: JobDescription):
     log.section("Loading %i models" % train_cfg.num_models)
     models = list()
     for i in range(train_cfg.num_models):
-        TT.profile("Load model")
+        TT.profile("Load models")
         log(f"Loading model {i+1} / {train_cfg.num_models}")
         model = Model(model_cfg).to(device)
         model.load_state_dict(torch.load(
@@ -116,7 +119,13 @@ def eval(job: JobDescription):
     )
 
     log.section("Evaluating")
-    states, eval_cfg.depths = gen_eval_states(env, eval_cfg.num_states, eval_cfg.min_scrambles, eval_cfg.max_scrambles)
+    if eval_cfg.cube_data_file:
+        log("Loading cube data file %s" % eval_cfg.cube_data_file)
+        states, eval_cfg.depths = load_cube_eval_states(eval_cfg.cube_data_file)
+        eval_cfg.num_states = len(states)
+    else:
+        log("Generating random states")
+        states, eval_cfg.depths = gen_eval_states(env, eval_cfg.num_states, eval_cfg.min_scrambles, eval_cfg.max_scrambles)
     log.debug("Evaluation depths: %s" % eval_cfg.depths)
 
     for i, state in enumerate(states):
@@ -132,7 +141,7 @@ def eval(job: JobDescription):
 
         log.debug(
             "Solved: %s" % did_solve,
-            "Length: %i" % len(actions),
+            "Length: %i" % len(actions) if did_solve else -1,
             "Time:   %.4f s" % time,
             "States: %s" % thousands_seperators(states_seen),
             "States per second: %s" % thousands_seperators(round(states_seen / time)),
@@ -142,7 +151,7 @@ def eval(job: JobDescription):
             TT.profile("Validate")
             new_state = state
             for action in actions:
-                new_state = env.move(action, new_state)
+                new_state = env.move(action.item(), new_state)
             if not env.is_solved(new_state):
                 log.error(
                     "State %s was not solved" % state,
@@ -158,6 +167,8 @@ def eval(job: JobDescription):
         100 * results.num_solved / eval_cfg.num_states,
     ))
     solved_states = torch.BoolTensor(results.solved)
+    if eval_cfg.cube_data_file:
+        raise NotImplementedError
     if solved_states.any():
         # Log statistics for solved states
         solve_times = torch.FloatTensor(results.solve_times)[solved_states]

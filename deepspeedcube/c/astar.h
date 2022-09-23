@@ -71,7 +71,7 @@ size_t astar_retrace_path(
     action *actions,  // Actions to solve the initial state go here (in reverse order)
     action *reverse_actions,  // index i gives the reverse of action i
     void *final_state,  // Final state seen that expands to solved state
-    void (act)(void *state, void *action, size_t num_actions),
+    void (act)(void *state, action action),
     astar_search *search
 );
 
