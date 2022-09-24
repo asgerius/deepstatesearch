@@ -58,13 +58,22 @@ def plot_states_seen(loc: str, cfg: EvalConfig, res: EvalResults):
 
 def plot_memory_usage(loc: str, cfg: EvalConfig, res: EvalResults):
     with plots.Figure(f"{loc}/plots-eval/memory-usage.png"):
-        memory_usage = np.array(res.mem_usage).ravel()
+        memory_usage = np.array(res.mem_usage)
 
         plt.plot(memory_usage / 2 ** 20, "-o")
         plt.title("Memory usage during evaluation")
         plt.xlabel("Evaluated states")
         plt.ylabel("Memory usage [MB]")
         plt.grid()
+
+def plot_solve_length_distribution(loc: str, cfg: EvalConfig, res: EvalResults):
+    with plots.Figure(f"{loc}/plots-eval/solve-length-distribution.png"):
+        solve_lengths = np.array(res.solve_lengths)
+        bins = np.arange(solve_lengths.min(), solve_lengths.max() + 2)
+        plt.hist(solve_lengths, bins, density=True, align="left", edgecolor="black", lw=2)
+
+        plt.xlabel("Solution length")
+        plt.ylabel("Probability density")
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -90,3 +99,4 @@ if __name__ == "__main__":
         plot_solve_states_seen(loc, cfg, res)
         plot_states_seen(loc, cfg, res)
         plot_memory_usage(loc, cfg, res)
+        plot_solve_length_distribution(loc, cfg, res)
