@@ -7,7 +7,7 @@
 
 #include "envs/envs.h"
 
-#define HEAP_BASE_SIZE 20000
+#define HEAP_BASE_SIZE 100000
 #define HEAP_PARENT(x, d) (((x) - 1) / (d))
 #define HEAP_LEFTMOST_CHILD(x, d) ((d) * (x) + 1)
 #define EITHER_OR(cond, x, y) ((cond) * (x) + (!(cond)) * (y))
