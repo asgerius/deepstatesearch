@@ -30,13 +30,13 @@ def plot_solve_states_seen(loc: str, cfg: EvalConfig, res: EvalResults):
     with plots.Figure(f"{loc}/plots-eval/solve-rate-states.png"):
         solved = np.array(res.solved)
         states_seen = np.array(res.states_seen)[solved]
-        states_seen = np.sort(states_seen)
+        states_seen = np.sort(states_seen) / 1e3
         solved_frac = np.linspace(0, solved.mean(), 1 + len(states_seen))[1:]
 
         if solved.any():
             plt.plot(states_seen, 100 * solved_frac, "--o")
 
-            plt.xlabel("States seen during search")
+            plt.xlabel("States seen during search (thousands)")
             plt.ylabel("Solved states [%]")
             plt.xlim([-0.07 * states_seen.max(), 1.07 * states_seen.max()])
             plt.ylim([-7, 107])
@@ -49,11 +49,11 @@ def plot_states_seen(loc: str, cfg: EvalConfig, res: EvalResults):
         states_seen = np.array(res.states_seen)
 
         for did_solve in True, False:
-            plt.scatter(solve_times[solved==did_solve], states_seen[solved==did_solve], label="Solved" if did_solve else "Not solved")
+            plt.scatter(solve_times[solved==did_solve], states_seen[solved==did_solve] / 1e3, label="Solved" if did_solve else "Not solved")
 
         plt.legend()
         plt.xlabel("Wall time [s]")
-        plt.ylabel("States seen")
+        plt.ylabel("States seen (thousands)")
         plt.grid()
 
 def plot_memory_usage(loc: str, cfg: EvalConfig, res: EvalResults):
@@ -74,6 +74,22 @@ def plot_solve_length_distribution(loc: str, cfg: EvalConfig, res: EvalResults):
 
         plt.xlabel("Solution length")
         plt.ylabel("Probability density")
+
+def plot_wall_time_distribution(loc: str, cfg: EvalConfig, res: EvalResults):
+    with plots.Figure(f"{loc}/plots-eval/wall-time-distribution.png"):
+        wall_time = np.array(res.solve_times)
+        plt.hist(wall_time, 30, density=True, align="left", edgecolor="black", lw=2)
+
+        plt.xlabel("Wall time [s]")
+        plt.ylabel("Probability density")
+
+def plot_states_seen_distribution(loc: str, cfg: EvalConfig, res: EvalResults):
+    with plots.Figure(f"{loc}/plots-eval/states-seen-distribution.png"):
+        states_seen = np.array(res.states_seen)
+        plt.hist(states_seen / 1e3, 30, density=True, align="left", edgecolor="black", lw=2)
+
+        plt.xlabel("States seen (thousands)")
+        plt.ylabel("Probability distribution")
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -100,3 +116,5 @@ if __name__ == "__main__":
         plot_states_seen(loc, cfg, res)
         plot_memory_usage(loc, cfg, res)
         plot_solve_length_distribution(loc, cfg, res)
+        plot_wall_time_distribution(loc, cfg, res)
+        plot_states_seen_distribution(loc, cfg, res)
