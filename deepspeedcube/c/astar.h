@@ -19,6 +19,7 @@ struct node {
     size_t g;
     size_t state_size;
     void *state;
+    uint64_t hash;
 };
 
 struct astar_search {

@@ -31,6 +31,13 @@ const char smaps[12][24] = {  // Sides
     {0, 1, 2, 3, 4, 5, 12, 13, 8, 9, 10, 11, 22, 23, 6, 7, 16, 17, 18, 19, 20, 21, 14, 15}
 };
 
+void cube_print_state(const face *state) {
+    for (size_t i = 0; i < 20; ++ i) {
+        printf("%hhu ", state[i]);
+    }
+    printf("\n");
+}
+
 void cube_act(face *state, action action) {
 
     // Slightly faster by only looking up maps once

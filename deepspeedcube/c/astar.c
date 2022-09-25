@@ -2,8 +2,7 @@
 
 
 uint64_t hash_node(const void *elem, uint64_t seed0, uint64_t seed1) {
-    const node *node = elem;
-    return hashmap_murmur(node->state, node->state_size, seed0, seed1);
+    return ((const node *)elem)->hash;
 }
 
 int compare_nodes(const void *elem1, const void *elem2, void *udata) {
@@ -17,7 +16,8 @@ node *init_node(
     float f,
     size_t g,
     size_t state_size,
-    void *state
+    void *state,
+    uint64_t hash
 ) {
     node *node_p = malloc(sizeof(node));
 
@@ -26,6 +26,7 @@ node *init_node(
     node_p->g = g;
     node_p->state_size = state_size;
     node_p->state = state;
+    node_p->hash = hash;
 
     return node_p;
 }
@@ -83,11 +84,12 @@ void astar_add_initial_state(
     astar_search *search
 ) {
     void *state_p = search->states + sizeof(void *);
+    memcpy(state_p, state, search->state_size);
     node *new_node_p = init_node(
-        NULL_ACTION, h, 0, search->state_size, state_p
+        NULL_ACTION, h, 0, search->state_size, state_p,
+        hashmap_murmur(state_p, search->state_size, 0, 0)
     );
 
-    memcpy(state_p, state, search->state_size);
     search->num_used_states = 1;
     hashmap_set(search->node_map, new_node_p);
     heap_insert(search->frontier, 1, &h, state);
@@ -107,6 +109,8 @@ void astar_iteration(
 
     // Get current nodes in parallel
     float *g_current = malloc(num_current_states * sizeof(*g_current));
+    uint64_t *hashes = malloc(num_neighbour_states * sizeof(*hashes));
+    size_t neighbours_per_state = num_neighbour_states / num_current_states;
     #pragma omp parallel for
     for (size_t i = 0; i < num_current_states; ++ i) {
         node tmp_node = {
@@ -114,8 +118,17 @@ void astar_iteration(
             .f = 0, .g = 0,
             .state_size = search->state_size,
             .state = (void *)current_states + i * search->state_size,
+            .hash = hashmap_murmur(current_states + i * search->state_size, search->state_size, 0, 0),
         };
         g_current[i] = ((node *)hashmap_get(search->node_map, &tmp_node))->g;
+
+        for (size_t j = 0; j < neighbours_per_state; ++ j) {
+            size_t neighbour_index = i * neighbours_per_state + j;
+            hashes[neighbour_index] = hashmap_murmur(
+                neighbour_states + neighbour_index * search->state_size,
+                search->state_size, 0, 0
+            );
+        }
     }
 
     // A temporary node used for node lookups. The state pointer is changed
@@ -128,10 +141,10 @@ void astar_iteration(
         .f = 0, .g = 0,
         .state_size = search->state_size,
         .state = NULL,
+        .hash = 0,
     };
 
     // i is the number of the current state, and j is the j'th neighbour of i
-    size_t neighbours_per_state = num_neighbour_states / num_current_states;
     for (size_t i = 0; i < num_current_states; ++ i) {
         size_t g_tentative = g_current[i] + 1;
 
@@ -142,9 +155,9 @@ void astar_iteration(
         #pragma unroll
         for (action j = 0; j < neighbours_per_state; ++ j) {
             size_t neighbour_index = i * neighbours_per_state + j;
-            void *neighbour = neighbour_states + neighbour_index * search->state_size;
 
-            tmp_node.state = neighbour;
+            tmp_node.state = neighbour_states + neighbour_index * search->state_size;
+            tmp_node.hash = hashes[neighbour_index];
             node *neighbour_node = hashmap_get(search->node_map, &tmp_node);
 
             if (neighbour_node != NULL && g_tentative < neighbour_node->g) {
@@ -158,17 +171,18 @@ void astar_iteration(
             } else if (neighbour_node == NULL) {
                 // Node has not been seen before, so add to node map and frontier
                 void *state_p = search->states + sizeof(void *) + search->num_used_states * search->state_size;
+                memcpy(
+                    state_p,
+                    tmp_node.state,
+                    search->state_size
+                );
                 node *new_node_p = init_node(
                     j,
                     search->lambda * g_tentative + h[neighbour_index],
                     g_tentative,
                     search->state_size,
-                    state_p
-                );
-                memcpy(
                     state_p,
-                    neighbour,
-                    search->state_size
+                    tmp_node.hash
                 );
                 hashmap_set(search->node_map, new_node_p);
                 heap_insert(search->frontier, 1, &new_node_p->f, new_node_p->state);
@@ -181,6 +195,7 @@ void astar_iteration(
     }
 
     free(g_current);
+    free(hashes);
 }
 
 size_t astar_longest_path(astar_search *search) {
@@ -200,6 +215,7 @@ size_t astar_retrace_path(
         .arrival_action = NULL_ACTION,
         .state_size = search->state_size,
         .state = final_state,
+        .hash = hashmap_murmur(final_state, search->state_size, 0, 0),
     };
     node *current_node = hashmap_get(search->node_map, &tmp_node);
 
@@ -213,6 +229,7 @@ size_t astar_retrace_path(
         // At this point, we can fuck up the states, so never mind inplace movements
         action reverse_action = reverse_actions[current_node->arrival_action];
         act(current_node->state, reverse_action);
+        current_node->hash = hashmap_murmur(current_node->state, current_node->state_size, 0, 0);
         current_node = hashmap_get(search->node_map, current_node);
 
         ++ i;
