@@ -5,3 +5,4 @@ torch>=1.10
 pelutils>=1.1
 py-cpuinfo>=8
 psutil>=5.8
+tqdm>=4.64

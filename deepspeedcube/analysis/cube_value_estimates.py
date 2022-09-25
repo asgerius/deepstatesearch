@@ -7,11 +7,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pelutils.ds.plots as plots
 import torch
-from pelutils import thousands_seperators
+from tqdm import tqdm
 
 from deepspeedcube import device
 from deepspeedcube.envs import get_env
-from deepspeedcube.eval.load_hard_cube_states import load_cube_eval_states
+from deepspeedcube.eval.load_hard_cube_states import load_hard_and_intermediate_states
 from deepspeedcube.model import Model, ModelConfig
 from deepspeedcube.train.train import TrainConfig
 
@@ -21,25 +21,41 @@ env = get_env("cube")
 @torch.no_grad()
 def value_estimates(out: str, qtm_datafile: str, model_names: list[str], model_sets: list[list[Model]]):
 
-    states, depths = load_cube_eval_states(qtm_datafile)
-    depths = torch.tensor(depths)
-    states = states[depths==24]
+    states = load_hard_and_intermediate_states(qtm_datafile).view(-1, *env.state_shape)
     states_d = states.to(device)
     states_oh = env.multiple_oh(states_d)
+    states = states.view(25, -1, *env.state_shape)
+    states_oh = states_oh.view(25, -1, env.state_oh_size)
 
     with plots.Figure(f"{out}/value-estimates-24.png"):
-        for model_name, model_set in zip(model_names, model_sets):
-            preds = np.zeros(len(states))
+        for model_name, model_set in tqdm(zip(model_names, model_sets), total=len(model_sets)):
+            preds = np.zeros(states.shape[1])
             for model in model_set:
-                preds += model(states_oh).squeeze().cpu().numpy()
+                preds += model(states_oh[-1]).squeeze().cpu().numpy()
             preds /= len(model_set)
 
             plt.plot(*plots.get_bins(preds, plots.normal_binning, bins=50), "-o", label=model_name)
 
         plt.legend()
-        plt.title("Cost-to-go estimates of %s distance 24 states" % thousands_seperators(len(states)))
         plt.xlabel("$J$")
         plt.ylabel("Probability density")
+        plt.grid()
+
+    with plots.Figure(f"{out}/value-estimates.png"):
+        plt.plot(np.arange(25), np.arange(25), "-o", color="grey", label="True value", alpha=0.7)
+
+        for model_name, model_set in tqdm(zip(model_names, model_sets), total=len(model_sets)):
+            preds = np.zeros((25, states.shape[1]))
+            for j in range(25):
+                for model in model_set:
+                    preds[j] += model(states_oh[j]).squeeze().cpu().numpy()
+            preds /= len(model_set)
+
+            plt.plot(preds.mean(axis=1), "-o", label=model_name)
+
+        plt.legend()
+        plt.xlabel("$J$")
+        plt.ylabel("True shortest distance")
         plt.grid()
 
 
