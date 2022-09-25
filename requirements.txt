@@ -1,5 +1,6 @@
 matplotlib>=3.5
 numpy>=1.21
+scipy>=1.23
 torch>=1.10
 
 pelutils>=1.1

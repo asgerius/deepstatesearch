@@ -8,6 +8,7 @@ import numpy as np
 import pelutils.ds.plots as plots
 import torch
 from tqdm import tqdm
+from scipy.stats.mstats import mquantiles
 
 from deepspeedcube import device
 from deepspeedcube.envs import get_env
@@ -34,7 +35,7 @@ def value_estimates(out: str, qtm_datafile: str, model_names: list[str], model_s
                 preds += model(states_oh[-1]).squeeze().cpu().numpy()
             preds /= len(model_set)
 
-            plt.plot(*plots.get_bins(preds, plots.normal_binning, bins=50), "-o", label=model_name)
+            plt.plot(*plots.get_bins(preds, plots.normal_binning, bins=50), label=model_name)
 
         plt.legend()
         plt.xlabel("$J$")
@@ -42,7 +43,7 @@ def value_estimates(out: str, qtm_datafile: str, model_names: list[str], model_s
         plt.grid()
 
     with plots.Figure(f"{out}/value-estimates.png"):
-        plt.plot(np.arange(25), np.arange(25), "-o", color="grey", label="True value", alpha=0.7)
+        plt.plot(np.arange(25), np.arange(25), "-o", color="grey", label="True shortest distance", alpha=0.7)
 
         for model_name, model_set in tqdm(zip(model_names, model_sets), total=len(model_sets)):
             preds = np.zeros((25, states.shape[1]))
@@ -51,11 +52,20 @@ def value_estimates(out: str, qtm_datafile: str, model_names: list[str], model_s
                     preds[j] += model(states_oh[j]).squeeze().cpu().numpy()
             preds /= len(model_set)
 
-            plt.plot(preds.mean(axis=1), "-o", label=model_name)
+            lower, upper = mquantiles(preds, prob=[0.05, 0.95], axis=1).T
+            preds = preds.mean(axis=1)
+            plt.errorbar(
+                np.arange(25),
+                preds,
+                [preds - lower, upper - preds],
+                fmt="-o",
+                capsize=6,
+                label=model_name,
+            )
 
         plt.legend()
-        plt.xlabel("$J$")
-        plt.ylabel("True shortest distance")
+        plt.xlabel("True shortest distance")
+        plt.ylabel("$J$")
         plt.grid()
 
 
