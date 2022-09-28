@@ -129,7 +129,11 @@ def eval(job: JobDescription):
     log.debug("Evaluation depths: %s" % eval_cfg.depths)
 
     for i, state in enumerate(states):
-        log.debug("State %i / %i" % (i + 1, eval_cfg.num_states))
+        # state = torch.tensor([ 4, 20, 22, 15,  7, 14,  1, 10, 14, 21,  9, 11, 13, 23, 18,  7, 17,  3, 0,  4], dtype=torch.uint8)
+        log.debug(
+            "State %i / %i" % (i + 1, eval_cfg.num_states),
+            state,
+        )
         actions, time, states_seen = solver.solve(state)
         did_solve = actions is not None and time <= eval_cfg.max_time
         results.num_solved += did_solve

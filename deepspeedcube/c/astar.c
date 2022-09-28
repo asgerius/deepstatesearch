@@ -17,6 +17,7 @@ node *init_node(
     size_t g,
     size_t state_size,
     void *state,
+    size_t *heap_index,
     uint64_t hash
 ) {
     node *node_p = malloc(sizeof(node));
@@ -26,6 +27,7 @@ node *init_node(
     node_p->g = g;
     node_p->state_size = state_size;
     node_p->state = state;
+    node_p->heap_index = heap_index;
     node_p->hash = hash;
 
     return node_p;
@@ -39,9 +41,15 @@ void astar_new_state_array(astar_search *search, bool is_first) {
         sizeof(void *) + search->state_size * NUM_STATES_PER_ARRAY(search->state_size)
     );
 
-    states[0] = is_first ? NULL : search->states;
+    void **heap_idcs = malloc(
+        sizeof(size_t *) + sizeof(size_t) * NUM_STATES_PER_ARRAY(search->state_size)
+    );
 
-    search->states = states;
+    states[0] = is_first ? NULL : search->states;
+    heap_idcs[0] = is_first ? NULL : search->heap_idcs;
+
+    search->states = (void *)states;
+    search->heap_idcs = (size_t *)heap_idcs;
     search->num_used_states = 0;
 }
 
@@ -63,12 +71,16 @@ astar_search *astar_init(
 }
 
 void astar_free(astar_search *search) {
-    void *next_arr = NULL;
+    void *next_state_arr = NULL;
+    size_t *next_index_arr = NULL;
     do {
-        next_arr = ((void **)search->states)[0];
+        next_state_arr = ((void **)search->states)[0];
+        next_index_arr = ((size_t **)search->heap_idcs)[0];
         free(search->states);
-        search->states = next_arr;
-    } while (next_arr != NULL);
+        free(search->heap_idcs);
+        search->states = next_state_arr;
+        search->heap_idcs = next_index_arr;
+    } while (next_state_arr != NULL);
     hashmap_free(search->node_map);
     heap_free(search->frontier);
     free(search);
@@ -86,13 +98,13 @@ void astar_add_initial_state(
     void *state_p = search->states + sizeof(void *);
     memcpy(state_p, state, search->state_size);
     node *new_node_p = init_node(
-        NULL_ACTION, h, 0, search->state_size, state_p,
+        NULL_ACTION, h, 0, search->state_size, state_p, search->heap_idcs + 1,
         hashmap_murmur(state_p, search->state_size, 0, 0)
     );
 
     search->num_used_states = 1;
+    heap_insert(search->frontier, h, state, new_node_p->heap_index);
     hashmap_set(search->node_map, new_node_p);
-    heap_insert(search->frontier, 1, &h, state);
 
     free(new_node_p);
 }
@@ -141,6 +153,7 @@ void astar_iteration(
         .f = 0, .g = 0,
         .state_size = search->state_size,
         .state = NULL,
+        .heap_index = 0,
         .hash = 0,
     };
 
@@ -165,9 +178,9 @@ void astar_iteration(
                 neighbour_node->f = search->lambda * g_tentative + h[neighbour_index];
                 neighbour_node->g = g_tentative;
                 neighbour_node->arrival_action = j;
-                // if (neighbour_node in search->frontier) {
-                //     heap_decrease_key(search->frontier, , neighbour_node->g);
-                // }
+                if (*neighbour_node->heap_index != 0) {
+                    heap_decrease_key(search->frontier, *neighbour_node->heap_index, neighbour_node->f);
+                }
             } else if (neighbour_node == NULL) {
                 // Node has not been seen before, so add to node map and frontier
                 void *state_p = search->states + sizeof(void *) + search->num_used_states * search->state_size;
@@ -182,10 +195,11 @@ void astar_iteration(
                     g_tentative,
                     search->state_size,
                     state_p,
+                    search->heap_idcs + 1 + search->num_used_states,
                     tmp_node.hash
                 );
+                heap_insert(search->frontier, new_node_p->f, new_node_p->state, new_node_p->heap_index);
                 hashmap_set(search->node_map, new_node_p);
-                heap_insert(search->frontier, 1, &new_node_p->f, new_node_p->state);
                 ++ search->num_used_states;
                 search->longest_path = MAX(search->longest_path, new_node_p->g);
 

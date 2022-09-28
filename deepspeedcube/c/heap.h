@@ -16,6 +16,7 @@
 struct heap_entry {
     float key;
     const void *data;
+    size_t *heap_index;
 };
 
 typedef struct heap_entry heap_entry;
@@ -25,7 +26,7 @@ struct heap {
     heap_entry *entries;
     size_t d;
     size_t element_size;
-    /* Number of elements in the heap. This will always be less than or
+    /* Number of elements in the heap including null element. This will always be less than or
     equal to the number of elements that has been allocated memory for. */
     size_t num_elems;
     size_t num_alloc;
@@ -48,7 +49,10 @@ void heap_increase_alloc(heap *heap_p);
 given arrays in order of ascending keys. */
 size_t heap_extract_min(heap *heap_p, size_t n, float *keys, void *data);
 
-void heap_insert(heap *heap_p, size_t n, const float *keys, const void *data);
+/* Insert an element into the heap. This function assumes that enough data has
+been allocated to the heap, which can be checked with heap_should_increase_alloc.
+If not, use heap_increase_alloc to double the amount of available memory. */
+void heap_insert(heap *heap_p, float key, const void *data, size_t *heap_index_p);
 
 void heap_decrease_key(heap *heap_p, size_t index, float key);
 

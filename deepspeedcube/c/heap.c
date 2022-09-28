@@ -6,7 +6,7 @@ heap *heap_alloc(size_t d, size_t element_size) {
     heap_p->entries = malloc(HEAP_BASE_SIZE * sizeof(heap_entry));
     heap_p->d = d;
     heap_p->element_size = element_size;
-    heap_p->num_elems = 0;
+    heap_p->num_elems = 1;
     heap_p->num_alloc = HEAP_BASE_SIZE;
 
     return heap_p;
@@ -36,7 +36,7 @@ void heap_increase_alloc(heap *heap_p) {
 }
 
 void bubble_up(heap *heap_p, size_t index) {
-    if (index == 0) {
+    if (index == 1) {
         return;
     }
 
@@ -50,6 +50,9 @@ void bubble_up(heap *heap_p, size_t index) {
         heap_entry entry_tmp = heap_p->entries[index];
         heap_p->entries[index] = heap_p->entries[index_parent];
         heap_p->entries[index_parent] = entry_tmp;
+
+        *heap_p->entries[index].heap_index = index;
+        *heap_p->entries[index_parent].heap_index = index_parent;
 
         bubble_up(heap_p, index_parent);
     }
@@ -84,6 +87,9 @@ void bubble_down(heap *heap_p, size_t index) {
         heap_p->entries[index] = heap_p->entries[index_lowest_child];
         heap_p->entries[index_lowest_child] = entry_tmp;
 
+        *heap_p->entries[index].heap_index = index;
+        *heap_p->entries[index_lowest_child].heap_index = index_lowest_child;
+
         bubble_down(heap_p, index_lowest_child);
     }
 }
@@ -91,38 +97,39 @@ void bubble_down(heap *heap_p, size_t index) {
 size_t heap_extract_min(heap *heap_p, size_t n, float *keys, void *data) {
     // Extracts up to n elements from the heap
     // Returns the exact number of elements extracted
-    n = MIN(n, heap_p->num_elems);
+    n = MIN(n, heap_p->num_elems - 1);
 
     for (size_t i = 0; i < n; ++ i) {
         // Copy key and data to out arrays
         void *data_out = data + i * heap_p->element_size;
-        memcpy(data_out, heap_p->entries[0].data, heap_p->element_size);
+        memcpy(data_out, heap_p->entries[1].data, heap_p->element_size);
 
         // Swap first and last elements and update heap order
         -- heap_p->num_elems;
-        heap_entry entry_tmp = heap_p->entries[0];
-        heap_p->entries[0] = heap_p->entries[heap_p->num_elems];
+
+        heap_entry entry_tmp = heap_p->entries[1];
+        heap_p->entries[1] = heap_p->entries[heap_p->num_elems];
         heap_p->entries[heap_p->num_elems] = entry_tmp;
 
-        bubble_down(heap_p, 0);
+        *heap_p->entries[1].heap_index = 1;
+        *heap_p->entries[heap_p->num_elems].heap_index = 0;
+
+        bubble_down(heap_p, 1);
     }
 
     return n;
 }
 
-void heap_insert(heap *heap_p, size_t n, const float *keys, const void *data) {
-    /* Insert n elements into the heap. This function assumes that enough data has
-    been allocated to the heap, which can be checked with heap_should_increase_alloc.
-    If not, use heap_increase_alloc to double the amount of available memory. */
+void heap_insert(heap *heap_p, float key, const void *data, size_t *heap_index_p) {
 
-    for (size_t i = 0; i < n; ++ i) {
-        heap_p->entries[heap_p->num_elems].key = keys[i];
-        heap_p->entries[heap_p->num_elems].data = data;
+    heap_p->entries[heap_p->num_elems].key = key;
+    heap_p->entries[heap_p->num_elems].data = data;
+    heap_p->entries[heap_p->num_elems].heap_index = heap_index_p;
+    *heap_p->entries[heap_p->num_elems].heap_index = heap_p->num_elems;
 
-        bubble_up(heap_p, heap_p->num_elems);
+    bubble_up(heap_p, heap_p->num_elems);
 
-        ++ heap_p->num_elems;
-    }
+    ++ heap_p->num_elems;
 }
 
 void heap_decrease_key(heap *heap_p, size_t index, float key) {
