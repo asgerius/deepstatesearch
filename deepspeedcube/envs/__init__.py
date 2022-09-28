@@ -247,11 +247,11 @@ class _SlidingPuzzle(Environment):
 
     @classmethod
     def reverse_move(cls, action: int) -> int:
-        return (action % 4 + 2) % 2
+        return (action + 2) % 4
 
     @classmethod
     def reverse_moves(cls, actions: torch.Tensor) -> torch.Tensor:
-        return (actions % 4 + 2) % 2
+        return (actions + 2) % 4
 
     @classmethod
     def string(cls, state: torch.Tensor) -> str:
