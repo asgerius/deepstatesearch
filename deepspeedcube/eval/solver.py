@@ -116,6 +116,7 @@ class AStar(Solver):
 
         with TT.profile("Add initial state"):
             LIBDSC.astar_add_initial_state(h, ptr(state), search_state_p)
+
         solved = False
 
         while self.tt.tock() < self.max_time:
@@ -124,7 +125,6 @@ class AStar(Solver):
 
             with TT.profile("Extract from frontier"):
                 _, current_states = self.extract_min(frontier_p)
-                # exit()
             with TT.profile("Get neighbours"):
                 _, neighbour_states = self.env.neighbours(current_states)
             with TT.profile("To device"):

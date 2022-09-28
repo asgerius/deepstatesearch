@@ -19,7 +19,6 @@ struct node {
     size_t g;
     size_t state_size;
     void *state;
-    size_t *heap_index;
     uint64_t hash;
 };
 
@@ -32,7 +31,6 @@ struct astar_search {
 
     size_t num_used_states;
     void *states;
-    size_t *heap_idcs;
 };
 
 typedef struct node node;
