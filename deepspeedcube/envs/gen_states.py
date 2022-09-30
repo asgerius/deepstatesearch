@@ -53,7 +53,10 @@ def gen_eval_states(env: Environment, num_states: int, min_scrambles: int, max_s
     return states, depths
 
 def get_batches_per_gen(env: Environment, batch_size: int) -> int:
-    max_gen_states = 100 * 10 ** 6
+    # Only generate up to 20 GB of states, though no more than half the available memory
+    available_memory = 20 * 10 ** 9
+    if available_memory > (max_mem := psutil.virtual_memory().total / 2):
+        available_memory = max_mem
 
     # Calculate memory requirements for scrambling
     state_memory           = tensor_size(env.get_solved())
@@ -74,12 +77,6 @@ def get_batches_per_gen(env: Environment, batch_size: int) -> int:
         thousands_seperators(total_batch_memory // 2 ** 20) + " MB",
     )
 
-    avail_mem = psutil.virtual_memory().total
-    max_memory_frac = 0.5
-    avail_mem *= max_memory_frac
-
-    num_batches = avail_mem // total_batch_memory
-    if num_batches * batch_size * (1 + len(env.action_space)) > max_gen_states:
-        num_batches = max_gen_states // (batch_size * (1 + len(env.action_space)))
+    num_batches = available_memory // total_batch_memory
 
     return num_batches
