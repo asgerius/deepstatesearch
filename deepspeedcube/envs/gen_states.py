@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import random
 
 import psutil
@@ -11,9 +12,7 @@ from deepspeedcube.envs import Environment
 
 
 def gen_new_states(env: Environment, num_states: int, K: int) -> tuple[torch.Tensor, torch.Tensor]:
-    assert num_states % K == 0
-    states_per_depth = num_states // K
-    log.debug("Generating %s states for %s states per depth" % (thousands_seperators(num_states), thousands_seperators(states_per_depth)))
+    states_per_depth = math.ceil(num_states / K)
 
     with TT.profile("Create states"):
         states = env.get_multiple_solved(states_per_depth * K)
@@ -33,13 +32,10 @@ def gen_new_states(env: Environment, num_states: int, K: int) -> tuple[torch.Ten
                 env.multiple_moves(actions, states[start:], inplace=True)
             scramble_depths[start:] += 1
 
-    with TT.profile("Reorganize states"):
-        with TT.profile("Index"):
-            index = (torch.arange(num_states, device=device) * states_per_depth) % num_states \
-                + torch.repeat_interleave(torch.arange(states_per_depth, device=device), num_states // states_per_depth)
-        with TT.profile("Reorganize"):
-            states = states[index].contiguous()
-            scramble_depths = scramble_depths[index].contiguous()
+    with TT.profile("Shuffle states"):
+        shuffle_index = torch.randperm(len(states), device=device).cpu()
+        states[:] = states[shuffle_index]
+        scramble_depths[:] = scramble_depths[shuffle_index]
 
     return states[:num_states], scramble_depths[:num_states]
 
@@ -64,7 +60,7 @@ def get_batches_per_gen(env: Environment, batch_size: int) -> int:
 
     # Calculate memory requirements for scrambling
     state_memory           = tensor_size(env.get_solved())
-    scramble_depths_memory = 2 * 4  # 2 x int32
+    scramble_depths_memory = 4  # int32
     actions_memory         = 1  # uint8
     shuffle_index_memory   = 8  # int64
     scramble_memory        = state_memory + scramble_depths_memory\
