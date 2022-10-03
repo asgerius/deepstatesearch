@@ -133,7 +133,7 @@ def train(job: JobDescription):
             for model in models:
                 model.eval()
 
-            states, depths = gen_new_states(env, 10 ** 4, train_cfg.K)
+            states, depths = gen_new_states(env, min(train_cfg.K * 10 ** 3, 5 * 10 ** 4), train_cfg.K)
             states_d = states.to(device)
             states_oh = env.multiple_oh(states_d)
             with TT.profile("Value estimates"), torch.no_grad(), amp.autocast() if train_cfg.fp16 else contextlib.ExitStack():

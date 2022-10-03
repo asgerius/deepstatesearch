@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import random
-from math import ceil
 
 import psutil
 import torch
@@ -15,6 +14,7 @@ def gen_new_states(env: Environment, num_states: int, K: int) -> tuple[torch.Ten
     if num_states % K:
         num_states = K * (num_states // K)
     states_per_depth = num_states // K
+    log.debug("Generating %s states for %s states per depth" % (thousands_seperators(num_states), thousands_seperators(states_per_depth)))
 
     with TT.profile("Create states"):
         states = env.get_multiple_solved(states_per_depth * K)
