@@ -20,6 +20,7 @@ LIBDSC.astar_frontier_ptr.restype = ctypes.c_void_p
 LIBDSC.astar_longest_path.restype = ctypes.c_size_t
 LIBDSC.astar_retrace_path.restype = ctypes.c_size_t
 LIBDSC.astar_num_states.restype = ctypes.c_size_t
+LIBDSC.values_node_map_from_states.restype = ctypes.c_void_p
 
 LIBDSC.astar_add_initial_state.argtypes = ctypes.c_float, ctypes.c_void_p, ctypes.c_void_p
 

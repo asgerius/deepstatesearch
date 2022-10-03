@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import ctypes
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -12,7 +13,7 @@ from pelutils import log, thousands_seperators, TT
 from pelutils.datastorage import DataStorage
 from pelutils.parser import JobDescription
 
-from deepspeedcube import device, tensor_size
+from deepspeedcube import LIBDSC, device, ptr, tensor_size
 from deepspeedcube.model import Model, ModelConfig
 from deepspeedcube.envs import NULL_ACTION, get_env
 from deepspeedcube.envs.gen_states import gen_new_states, get_batches_per_gen
@@ -21,17 +22,18 @@ from deepspeedcube.model.generator_network import clone_model, update_generator_
 
 @dataclass
 class TrainConfig(DataStorage, json_name="train_config.json", indent=4):
-    env:          str
-    num_models:   int
-    batches:      int
-    batch_size:   int
-    K:            int
-    lr:           float
-    tau:          float
-    tau_every:    int
-    weight_decay: float
-    epsilon:      float
-    fp16:         bool
+    env:                str
+    num_models:         int
+    batches:            int
+    batch_size:         int
+    K:                  int
+    lr:                 float
+    tau:                float
+    tau_every:          int
+    weight_decay:       float
+    epsilon:            float
+    known_states_depth: int
+    fp16:               bool
 
 @dataclass
 class TrainResults(DataStorage, json_name="train_results.json", indent=4):
@@ -48,17 +50,18 @@ def train(job: JobDescription):
     # Args either go into the model config or into the training config
     # Those that go into the training config are filtered out here
     train_cfg = TrainConfig(
-        env          = job.env,
-        num_models   = job.num_models,
-        batches      = job.batches,
-        batch_size   = job.batch_size,
-        K            = job.k,
-        lr           = job.lr,
-        tau          = job.tau,
-        tau_every    = job.tau_every,
-        weight_decay = job.weight_decay,
-        epsilon      = job.epsilon,
-        fp16         = job.fp16,
+        env                 = job.env,
+        num_models          = job.num_models,
+        batches             = job.batches,
+        batch_size          = job.batch_size,
+        K                   = job.k,
+        lr                  = job.lr,
+        tau                 = job.tau,
+        tau_every           = job.tau_every,
+        weight_decay        = job.weight_decay,
+        epsilon             = job.epsilon,
+        known_states_depth  = job.known_states_depth,
+        fp16                = job.fp16,
     )
     train_cfg.fp16 = train_cfg.fp16 and torch.cuda.is_available()
     log("Got training config", train_cfg)
@@ -124,6 +127,32 @@ def train(job: JobDescription):
     log("During training, each model will perform updates from %s cost-to-go estimates and see %s states in total" % (
         thousands_seperators(num_states_update), thousands_seperators(num_states_total)
     ))
+
+    if train_cfg.known_states_depth:
+        log("Generating easy, known states up to depth %i" % train_cfg.known_states_depth)
+        with TT.profile("Generate known states"):
+            num_states = (len(env.action_space) ** np.arange(train_cfg.known_states_depth + 1)).sum()
+            known_states = torch.empty((num_states, *env.state_shape), dtype=env.dtype)
+            known_states[0] = env.get_solved()
+            start = 1
+            current_num_states = 1
+            for i in range(1, train_cfg.known_states_depth+1):
+                known_states[start:start + len(env.action_space) * current_num_states] \
+                    = env.neighbours(known_states[start - current_num_states:start])[1]
+                current_num_states *= len(env.action_space)
+                start += current_num_states
+
+        log("Inserting known states into map")
+        with TT.profile("Insert known states"):
+            known_states_map_p = ctypes.c_void_p(LIBDSC.values_node_map_from_states(
+                len(known_states), env.state_size,
+                ptr(known_states), len(env.action_space),
+            ))
+
+        log(
+            "Generated %s easy, known states" % thousands_seperators(num_states),
+            "Size of state array in bytes: %s" % thousands_seperators(tensor_size(known_states))
+        )
 
     for i in range(train_cfg.batches):
 
@@ -201,7 +230,10 @@ def train(job: JobDescription):
 
             with TT.profile("Transfer states to device"):
                 states = all_states[i % batches_per_gen, j]
+                # print(states.device)
+                # print("0x%x" % ptr(states).value)
                 states_d = states.to(device)
+                # print(states.device)
 
                 to_neighbour_actions_d = all_to_neighbour_actions[i % batches_per_gen, j].to(device)
 
@@ -219,9 +251,10 @@ def train(job: JobDescription):
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
 
-            with TT.profile("Set solved states to j = 0"):
-                solved_states = env.multiple_is_solved_d(neighbour_states_d)
-                J[solved_states] = 0
+            if not train_cfg.known_states_depth:
+                with TT.profile("Set solved states to j = 0"):
+                    solved_states = env.multiple_is_solved_d(neighbour_states_d)
+                    J[solved_states] = 0
             J = J.view(len(states_d), len(env.action_space))
 
             with TT.profile("Calculate targets"):
@@ -235,6 +268,12 @@ def train(job: JobDescription):
                 g = g * 1e10 + 1
                 targets = torch.min(g + J, dim=1).values
             TT.end_profile()
+
+            if train_cfg.known_states_depth:
+                with TT.profile("Set known state values"):
+                    targets_cpu = targets.cpu()
+                    LIBDSC.values_set(len(targets_cpu), env.state_size, ptr(states), ptr(targets_cpu), known_states_map_p)
+                    targets = targets_cpu.to(device)
 
             with TT.profile("OH states"):
                 states_oh = env.multiple_oh(states_d)
@@ -290,6 +329,8 @@ def train(job: JobDescription):
         log("Mean loss: %.4f" % (sum(ls[-1] for ls in train_results.losses) / train_cfg.num_models))
 
         TT.end_profile()
+
+    LIBDSC.values_free(known_states_map_p)
 
     log.section("Saving")
     with TT.profile("Save"):

@@ -25,6 +25,7 @@ options = (
     Option("dropout",             default=0, type=float),
     Option("weight-decay",        default=0, type=float),
     Option("epsilon",             default=1e6, type=float),
+    Option("known-states-depth",  default=0),
     Flag("fp16"),
 )
 
