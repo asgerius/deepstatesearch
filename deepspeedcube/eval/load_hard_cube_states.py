@@ -10,10 +10,9 @@ from deepspeedcube.envs import get_env
 _env = get_env("cube")
 _action_map = "F", "B", "U", "D", "L", "R"
 
-def load_cube_eval_states(path: str) -> tuple[torch.Tensor, list[int]]:
+def load_cube_eval_states(path: str) -> torch.Tensor:
 
     states = list()
-    depths = list()
 
     with open(path) as f:
         for line in f:
@@ -23,6 +22,8 @@ def load_cube_eval_states(path: str) -> tuple[torch.Tensor, list[int]]:
 
             assert len(scramble) % 2 == 0
             depth = len(scramble) // 2
+            if depth != 24:
+                continue
             state = _env.get_solved()
             for i in range(depth):
                 act = _action_map.index(scramble[i*2])
@@ -31,9 +32,8 @@ def load_cube_eval_states(path: str) -> tuple[torch.Tensor, list[int]]:
                     state = _env.move(act, state)
 
             states.append(state)
-            depths.append(depth)
 
-    return torch.vstack(states), depths
+    return torch.vstack(states)
 
 
 def load_hard_and_intermediate_states(path: str) -> torch.Tensor:

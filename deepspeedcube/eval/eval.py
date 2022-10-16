@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass
 
@@ -121,7 +122,8 @@ def eval(job: JobDescription):
     log.section("Evaluating")
     if eval_cfg.cube_data_file:
         log("Loading cube data file %s" % eval_cfg.cube_data_file)
-        states, eval_cfg.depths = load_cube_eval_states(eval_cfg.cube_data_file)
+        states = load_cube_eval_states(eval_cfg.cube_data_file)
+        eval_cfg.depths = [24] * len(states)
         eval_cfg.num_states = len(states)
     else:
         log("Generating random states")
@@ -139,7 +141,7 @@ def eval(job: JobDescription):
         results.solve_lengths.append(len(actions) if did_solve else -1)
         results.mem_usage.append(psutil.Process(os.getpid()).memory_info().rss)
 
-        log.debug(
+        log(
             "Solved: %s" % did_solve,
             "Length: %i" % len(actions) if did_solve else -1,
             "Time:   %.4f s" % time,
@@ -161,25 +163,32 @@ def eval(job: JobDescription):
                 raise RuntimeError("Failed to solve state")
             TT.end_profile()
 
-    log.debug("Solved %i / %i = %.0f %%" % (
+    log.section("Calculating solution statistics")
+    log("Solved %i / %i = %.0f %%" % (
         results.num_solved,
         eval_cfg.num_states,
         100 * results.num_solved / eval_cfg.num_states,
     ))
     solved_states = torch.BoolTensor(results.solved)
     if eval_cfg.cube_data_file:
-        raise NotImplementedError
+        num_optimally_solved = sum(sl == 24 for sl in results.solve_lengths)
+        log(
+            "Solved optimally: %i (%.2f %%)" % (num_optimally_solved, 100 * num_optimally_solved / eval_cfg.num_states),
+            "Solved:           %i (%.2f %%)" % (results.num_solved, 100 * results.num_solved / eval_cfg.num_states),
+            "Total states:     %i" % eval_cfg.num_states,
+        )
     if solved_states.any():
         # Log statistics for solved states
         solve_times = torch.FloatTensor(results.solve_times)[solved_states]
         states_seen = torch.FloatTensor(results.states_seen)[solved_states]
         solve_lengths = torch.FloatTensor(results.solve_lengths)[solved_states]
-        log.debug(
+        log(
             "For the solved states:",
-            "Avg. solution time:    %.2f ms" % (1000 * solve_times.mean()),
-            "Avg. states seen:      %s" % thousands_seperators(round(states_seen.mean().item())),
-            "Avg. nodes per second: %s" % thousands_seperators(round(states_seen.mean().item() / solve_times.mean().item())),
-            "Avg. solution length:  %.2f" % solve_lengths.mean(),
+            "Avg. solution time:       %.2f ms" % (1000 * solve_times.mean()),
+            "Avg. states seen:         %s" % thousands_seperators(round(states_seen.mean().item())),
+            "Avg. nodes per second:    %s" % thousands_seperators(round(states_seen.mean().item() / solve_times.mean().item())),
+            "Avg. solution length:     %.2f" % solve_lengths.mean(),
+            "Solution length 95 %% CI: +/- %.2f" % (solve_lengths.std() / math.sqrt(len(solve_lengths))),
             sep="\n    ",
         )
 
