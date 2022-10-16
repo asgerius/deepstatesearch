@@ -8,6 +8,7 @@ import psutil
 import torch
 from pelutils import DataStorage, log, TT, thousands_seperators
 from pelutils.parser import JobDescription
+from pelutils.ds.stats import z
 
 from deepspeedcube import device
 from deepspeedcube.envs import get_env
@@ -188,7 +189,7 @@ def eval(job: JobDescription):
             "Avg. states seen:         %s" % thousands_seperators(round(states_seen.mean().item())),
             "Avg. nodes per second:    %s" % thousands_seperators(round(states_seen.mean().item() / solve_times.mean().item())),
             "Avg. solution length:     %.2f" % solve_lengths.mean(),
-            "Solution length 95 %% CI: +/- %.2f" % (solve_lengths.std() / math.sqrt(len(solve_lengths))),
+            "Solution length 95 %% CI: +/- %.2f" % (z() * solve_lengths.std() / math.sqrt(len(solve_lengths))),
             sep="\n    ",
         )
 
