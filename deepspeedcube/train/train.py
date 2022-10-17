@@ -330,7 +330,8 @@ def train(job: JobDescription):
 
         TT.end_profile()
 
-    LIBDSC.values_free(known_states_map_p)
+    if train_cfg.known_states_depth:
+        LIBDSC.values_free(known_states_map_p)
 
     log.section("Saving")
     with TT.profile("Save"):
