@@ -202,11 +202,20 @@ class _CubeEnvironment(Environment):
 
 class _SlidingPuzzle(Environment):
 
-    size: ctypes.c_short
     dtype = torch.int8
     action_space = torch.arange(4, dtype=torch.uint8)
 
     move_fn = LIBDSC.sliding_act
+
+    def __init_subclass__(cls, size: int):
+        cls.size = ctypes.c_int(size)
+        cls.state_shape = torch.Size([3 + size ** 2])
+        cls.state_oh_size = size ** 4
+        cls._solved_state = torch.concat((
+            torch.tensor([0, 0, size]), torch.arange(size ** 2)
+        )).to(_SlidingPuzzle.dtype)
+        cls._solved_state_d = cls._solved_state.to(device)
+        cls.state_size = tensor_size(cls._solved_state)
 
     @classmethod
     def multiple_moves(cls, actions: torch.Tensor, states: torch.Tensor, inplace=False) -> torch.Tensor:
@@ -260,68 +269,23 @@ class _SlidingPuzzle(Environment):
         for i in range(size ** 2):
             row = i // size
             col = i % size
-            readable_state[row, col] = state[i+2]
+            readable_state[row, col] = state[i+3]
         return str(readable_state)
 
-class _SlidingPuzzle15(_SlidingPuzzle):
+class _SlidingPuzzle15(_SlidingPuzzle, size=4):
+    pass
 
-    size = ctypes.c_short(4)
+class _SlidingPuzzle24(_SlidingPuzzle, size=5):
+    pass
 
-    state_shape = torch.Size([3 + size.value ** 2])
-    state_oh_size = size.value ** 4
-    _solved_state = torch.concat((
-        torch.tensor([0, 0, size.value]), torch.arange(size.value ** 2)
-    )).to(_SlidingPuzzle.dtype)
-    _solved_state_d = _solved_state.to(device)
-    state_size = tensor_size(_solved_state)
+class _SlidingPuzzle35(_SlidingPuzzle, size=6):
+    pass
 
-class _SlidingPuzzle24(_SlidingPuzzle):
+class _SlidingPuzzle48(_SlidingPuzzle, size=7):
+    pass
 
-    size = ctypes.c_short(5)
-
-    state_shape = torch.Size([3 + size.value ** 2])
-    state_oh_size = size.value ** 4
-    _solved_state = torch.concat((
-        torch.tensor([0, 0, size.value]), torch.arange(size.value ** 2)
-    )).to(_SlidingPuzzle.dtype)
-    _solved_state_d = _solved_state.to(device)
-    state_size = tensor_size(_solved_state)
-
-class _SlidingPuzzle35(_SlidingPuzzle):
-
-    size = ctypes.c_short(6)
-
-    state_shape = torch.Size([3 + size.value ** 2])
-    state_oh_size = size.value ** 4
-    _solved_state = torch.concat((
-        torch.tensor([0, 0, size.value]), torch.arange(size.value ** 2)
-    )).to(_SlidingPuzzle.dtype)
-    _solved_state_d = _solved_state.to(device)
-    state_size = tensor_size(_solved_state)
-
-class _SlidingPuzzle48(_SlidingPuzzle):
-
-    size = ctypes.c_short(7)
-
-    state_shape = torch.Size([3 + size.value ** 2])
-    state_oh_size = size.value ** 4
-    _solved_state = torch.concat((
-        torch.tensor([0, 0, size.value]), torch.arange(size.value ** 2)
-    )).to(_SlidingPuzzle.dtype)
-    _solved_state_d = _solved_state.to(device)
-    state_size = tensor_size(_solved_state)
-
-class _SlidingPuzzle63(_SlidingPuzzle):
-
-    size = ctypes.c_short(8)
-
-    state_shape = torch.Size([3 + size.value ** 2])
-    state_oh_size = size.value ** 4
-    _solved_state = torch.concat((
-        torch.tensor([0, 0, size.value]), torch.arange(size.value ** 2)
-    )).to(_SlidingPuzzle.dtype)
-    _solved_state_d = _solved_state.to(device)
-    state_size = tensor_size(_solved_state)
+class _SlidingPuzzle63(_SlidingPuzzle, size=8):
+    pass
 
 
 _ENVS = {
