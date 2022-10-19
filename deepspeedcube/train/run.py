@@ -27,14 +27,15 @@ options = (
     Option("epsilon",             default=1e6, type=float),
     Option("known-states-depth",  default=0),
     Flag("fp16"),
+    Flag("resume"),
 )
 
 if __name__ == "__main__":
     parser = Parser(*options, multiple_jobs=True)
-    job_descriptions = parser.parse_args(clear_folders=True)
+    job_descriptions = parser.parse_args()
     for i, job in enumerate(job_descriptions):
         TT.reset()
-        log.configure(f"{job.location}/train.log")
+        log.configure(f"{job.location}/train.log", append=job.resume)
         with log.log_errors:
             log.section(f"Training {i+1} / {len(job_descriptions)}: {job.name}")
             log.log_repo()

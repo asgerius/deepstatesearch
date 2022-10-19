@@ -5,7 +5,7 @@ import numpy as np
 import pelutils.ds.plots as plots
 from pelutils import log
 
-from deepspeedcube.train.train import TrainConfig, TrainResults
+from deepspeedcube.train import TrainConfig, TrainResults
 
 
 def plot_loss(loc: str, cfg: TrainConfig, res: TrainResults):
@@ -38,7 +38,7 @@ def plot_value_estimates(loc: str, cfg: TrainConfig, res: TrainResults):
 
 def plot_lr(loc: str, cfg: TrainConfig, res: TrainResults):
     with plots.Figure(f"{loc}/plots-train/lr.png"):
-        plt.plot(np.arange(cfg.batches), res.lr)
+        plt.plot(np.arange(res.current_batch), res.lr)
         plt.grid()
         plt.xlabel("Batch")
         plt.ylabel("Learning rate")

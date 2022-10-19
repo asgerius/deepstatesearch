@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import ctypes
-from dataclasses import dataclass, field
 
 import numpy as np
 import torch
@@ -10,7 +9,6 @@ import torch.cuda.amp as amp
 import torch.nn as nn
 import torch.optim as optim
 from pelutils import log, thousands_seperators, TT
-from pelutils.datastorage import DataStorage
 from pelutils.parser import JobDescription
 
 from deepspeedcube import LIBDSC, device, ptr, tensor_size
@@ -18,71 +16,77 @@ from deepspeedcube.model import Model, ModelConfig
 from deepspeedcube.envs import NULL_ACTION, get_env
 from deepspeedcube.envs.gen_states import gen_new_states, get_batches_per_gen
 from deepspeedcube.model.generator_network import clone_model, update_generator_network
+from deepspeedcube.plot.plot_training import plot_loss, plot_lr, plot_value_estimates
+from deepspeedcube.train import TrainConfig, TrainResults
 
 
-@dataclass
-class TrainConfig(DataStorage, json_name="train_config.json", indent=4):
-    env:                str
-    num_models:         int
-    batches:            int
-    batch_size:         int
-    K:                  int
-    lr:                 float
-    tau:                float
-    tau_every:          int
-    weight_decay:       float
-    epsilon:            float
-    known_states_depth: int
-    fp16:               bool
+def save_and_plot(loc: str, train_cfg: TrainConfig, model_cfg: ModelConfig, train_results: TrainResults, models: list[Model]):
+    with TT.profile("Save"):
+        train_cfg.save(loc)
+        model_cfg.save(loc)
+        train_results.save(loc)
 
-@dataclass
-class TrainResults(DataStorage, json_name="train_results.json", indent=4):
-    eval_idx: list[int]
-    # depth [ batch [ value ] ]
-    value_estimations: list[list[float]] = field(default_factory=list)
+        for i, model in enumerate(models):
+            torch.save(model.state_dict(), f"{loc}/model-{i}.pt")
 
-    lr: list[float] = field(default_factory=list)
-    # model [ batch [ loss ] ]
-    losses: list[list[float]] = field(default_factory=list)
+    log.section("Plotting")
+    with TT.profile("Plot"):
+        plot_loss(loc, train_cfg, train_results)
+        plot_lr(loc, train_cfg, train_results)
+        plot_value_estimates(loc, train_cfg, train_results)
+
+def evenly_spaced_index(num_batches: int, every: int) -> set[int]:
+    batch_index = np.arange(0, num_batches, every, dtype=int).tolist()
+    if (last_batch_idx := num_batches - 1) != batch_index[-1]:
+        batch_index.append(last_batch_idx)
+    return set(batch_index)
 
 def train(job: JobDescription):
 
     # Args either go into the model config or into the training config
     # Those that go into the training config are filtered out here
-    train_cfg = TrainConfig(
-        env                 = job.env,
-        num_models          = job.num_models,
-        batches             = job.batches,
-        batch_size          = job.batch_size,
-        K                   = job.k,
-        lr                  = job.lr,
-        tau                 = job.tau,
-        tau_every           = job.tau_every,
-        weight_decay        = job.weight_decay,
-        epsilon             = job.epsilon,
-        known_states_depth  = job.known_states_depth,
-        fp16                = job.fp16,
-    )
+    if job.resume:
+        train_cfg = TrainConfig.load(job.location)
+    else:
+        train_cfg = TrainConfig(
+            env                 = job.env,
+            num_models          = job.num_models,
+            batches             = job.batches,
+            batch_size          = job.batch_size,
+            K                   = job.k,
+            lr                  = job.lr,
+            tau                 = job.tau,
+            tau_every           = job.tau_every,
+            weight_decay        = job.weight_decay,
+            epsilon             = job.epsilon,
+            known_states_depth  = job.known_states_depth,
+            fp16                = job.fp16,
+        )
     train_cfg.fp16 = train_cfg.fp16 and torch.cuda.is_available()
+
     log("Got training config", train_cfg)
 
     log("Setting up environment '%s'" % train_cfg.env)
     env = get_env(train_cfg.env)
 
-    eval_batches = np.arange(0, train_cfg.batches, 1000, dtype=int).tolist()
-    if (last_batch_idx := train_cfg.batches - 1) != eval_batches[-1]:
-        eval_batches.append(last_batch_idx)
-    log("Evaluating at batches", eval_batches)
+    eval_batches = evenly_spaced_index(train_cfg.batches, 1000)
+    log("Evaluating at batches", sorted(eval_batches))
+    save_and_plot_batches = evenly_spaced_index(train_cfg.batches, 20000)
+    log("Saving and plotting at batches", sorted(save_and_plot_batches))
+
 
     log.section("Building models")
-    model_cfg = ModelConfig(
-        state_size          = env.state_oh_size,
-        hidden_layer_sizes  = job.hidden_layer_sizes,
-        num_residual_blocks = job.num_residual_blocks,
-        residual_size       = job.residual_size,
-        dropout             = job.dropout,
-        j_norm              = job.j_norm,
-    )
+    if job.resume:
+        model_cfg = ModelConfig.load(job.location)
+    else:
+        model_cfg = ModelConfig(
+            state_size          = env.state_oh_size,
+            hidden_layer_sizes  = job.hidden_layer_sizes,
+            num_residual_blocks = job.num_residual_blocks,
+            residual_size       = job.residual_size,
+            dropout             = job.dropout,
+            j_norm              = job.j_norm,
+        )
     log("Got model config", model_cfg)
 
     criterion = nn.MSELoss()
@@ -91,9 +95,12 @@ def train(job: JobDescription):
     optimizers = list()
     schedulers = list()
     scalers = list()
-    for _ in range(train_cfg.num_models):
+    for i in range(train_cfg.num_models):
         TT.profile("Build model")
         model = Model(model_cfg).to(device)
+        if job.resume:
+            sd = torch.load(f"{job.location}/model-{i}.pt", map_location=device)
+            model.load_state_dict(sd)
         gen_model = Model(model_cfg).to(device)
         gen_model.eval()
         clone_model(model, gen_model)
@@ -115,9 +122,12 @@ def train(job: JobDescription):
     log(models[0], "Size in bytes: %s" % thousands_seperators(4*models[0].numel()))
 
     log.section("Starting training")
-    train_results = TrainResults(eval_idx=eval_batches)
-    train_results.value_estimations.extend(list() for _ in range(train_cfg.K))
-    train_results.losses.extend(list() for _ in range(train_cfg.num_models))
+    if job.resume:
+        train_results = TrainResults.load(job.location)
+    else:
+        train_results = TrainResults(current_batch=0)
+        train_results.value_estimations.extend(list() for _ in range(train_cfg.K))
+        train_results.losses.extend(list() for _ in range(train_cfg.num_models))
 
     batches_per_gen = get_batches_per_gen(env, train_cfg.num_models * train_cfg.batch_size)
     log("Generating states every %i batches" % batches_per_gen)
@@ -154,17 +164,26 @@ def train(job: JobDescription):
             "Size of state array in bytes: %s" % thousands_seperators(tensor_size(known_states))
         )
 
-    for i in range(train_cfg.batches):
+    with TT.profile("Update LR scheduler"):
+        for i in range(train_results.current_batch):
+            for scheduler in schedulers:
+                scheduler.step()
+
+    first_batch = train_results.current_batch
+    for i in range(first_batch, train_cfg.batches):
 
         if i in eval_batches:
+            train_results.eval_idx.append(i)
             TT.profile("Evaluate")
             log("Evaluating value estimates")
             for model in models:
                 model.eval()
 
-            states, depths = gen_new_states(env, min(train_cfg.K * 10 ** 3, 5 * 10 ** 4), train_cfg.K)
+            with TT.profile("Generate states"):
+                states, depths = gen_new_states(env, min(train_cfg.K * 10 ** 3, 5 * 10 ** 4), train_cfg.K)
             states_d = states.to(device)
-            states_oh = env.multiple_oh(states_d)
+            with TT.profile("One-hot"):
+                states_oh = env.multiple_oh(states_d)
             with TT.profile("Value estimates"), torch.no_grad(), amp.autocast() if train_cfg.fp16 else contextlib.ExitStack():
                 preds = torch.zeros(len(states_d), device=device)
                 for model in models:
@@ -181,10 +200,14 @@ def train(job: JobDescription):
 
             TT.end_profile()
 
+        if i in save_and_plot_batches:
+            log.section("Saving")
+            save_and_plot(job.location, train_cfg, model_cfg, train_results, models)
+
         TT.profile("Batch")
         log("Batch %i / %i" % (i+1, train_cfg.batches))
 
-        if i % batches_per_gen == 0:
+        if i % batches_per_gen == 0 or i == first_batch:
             num_states = batches_per_gen * train_cfg.batch_size * train_cfg.num_models
             log(
                 "Generating states:",
@@ -230,10 +253,7 @@ def train(job: JobDescription):
 
             with TT.profile("Transfer states to device"):
                 states = all_states[i % batches_per_gen, j]
-                # print(states.device)
-                # print("0x%x" % ptr(states).value)
                 states_d = states.to(device)
-                # print(states.device)
 
                 to_neighbour_actions_d = all_to_neighbour_actions[i % batches_per_gen, j].to(device)
 
@@ -330,14 +350,9 @@ def train(job: JobDescription):
 
         TT.end_profile()
 
+        train_results.current_batch += 1
+
     if train_cfg.known_states_depth:
         LIBDSC.values_free(known_states_map_p)
 
-    log.section("Saving")
-    with TT.profile("Save"):
-        train_cfg.save(job.location)
-        model_cfg.save(job.location)
-        train_results.save(job.location)
-
-        for i, model in enumerate(models):
-            torch.save(model.state_dict(), f"{job.location}/model-{i}.pt")
+    save_and_plot(job.location, train_cfg, model_cfg, train_results, models)
