@@ -41,6 +41,10 @@ def evenly_spaced_index(num_batches: int, every: int) -> set[int]:
         batch_index.append(last_batch_idx)
     return set(batch_index)
 
+def cuda_sync():
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+
 def train(job: JobDescription):
 
     # Args either go into the model config or into the training config
@@ -264,17 +268,18 @@ def train(job: JobDescription):
             TT.profile("Value estimates")
             with TT.profile("OH neighbour states"):
                 neighbour_states_oh = env.multiple_oh(neighbour_states_d)
+                cuda_sync()
             assert neighbour_states_d.is_contiguous() and neighbour_states_oh.is_contiguous()
 
             with TT.profile("Forward pass"), torch.no_grad(), amp.autocast() if train_cfg.fp16 else contextlib.ExitStack():
                 J = gen_model(neighbour_states_oh).squeeze()
-                if torch.cuda.is_available():
-                    torch.cuda.synchronize()
+                cuda_sync()
 
             if not train_cfg.known_states_depth:
                 with TT.profile("Set solved states to j = 0"):
                     solved_states = env.multiple_is_solved_d(neighbour_states_d)
                     J[solved_states] = 0
+                    cuda_sync()
             J = J.view(len(states_d), len(env.action_space))
 
             with TT.profile("Calculate targets"):
@@ -287,6 +292,7 @@ def train(job: JobDescription):
                     .view(len(states_d), len(env.action_space))
                 g = g * 1e10 + 1
                 targets = torch.min(g + J, dim=1).values
+                cuda_sync()
             TT.end_profile()
 
             if train_cfg.known_states_depth:
@@ -297,23 +303,28 @@ def train(job: JobDescription):
 
             with TT.profile("OH states"):
                 states_oh = env.multiple_oh(states_d)
+                cuda_sync()
             assert states_d.is_contiguous() and states_oh.is_contiguous()
 
             with TT.profile("Train model"), amp.autocast() if train_cfg.fp16 else contextlib.ExitStack():
-                preds = model(states_oh).squeeze()
+                with TT.profile("Forward pass"):
+                    preds = model(states_oh).squeeze()
+                    cuda_sync()
                 loss = criterion(preds, targets)
-                if train_cfg.fp16:
-                    scalers[j].scale(loss).backward()
-                    scalers[j].step(optimizer)
-                    scalers[j].update()
-                else:
-                    loss.backward()
-                    optimizer.step()
+                with TT.profile("Backwards propagation"):
+                    if train_cfg.fp16:
+                        scalers[j].scale(loss).backward()
+                        scalers[j].step(optimizer)
+                        scalers[j].update()
+                    else:
+                        loss.backward()
+                        optimizer.step()
+                    cuda_sync()
+
                 optimizer.zero_grad()
                 log.debug("Loss: %.4f" % loss.item())
                 train_results.losses[j].append(loss.item())
-                if torch.cuda.is_available():
-                    torch.cuda.synchronize()
+                cuda_sync()
 
             if j == 0:
                 train_results.lr.append(schedulers[j].get_last_lr()[0])

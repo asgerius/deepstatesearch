@@ -185,10 +185,10 @@ def eval(job: JobDescription):
         solve_lengths = torch.FloatTensor(results.solve_lengths)[solved_states]
         log(
             "For the solved states:",
-            "Avg. solution time:       %.2f ms" % (1000 * solve_times.mean()),
-            "Avg. states seen:         %s" % thousands_seperators(round(states_seen.mean().item())),
-            "Avg. nodes per second:    %s" % thousands_seperators(round(states_seen.mean().item() / solve_times.mean().item())),
-            "Avg. solution length:     %.2f" % solve_lengths.mean(),
+            "Avg. solution time:      %.2f ms" % (1000 * solve_times.mean()),
+            "Avg. states seen:        %s" % thousands_seperators(round(states_seen.mean().item())),
+            "Avg. nodes per second:   %s" % thousands_seperators(round(states_seen.mean().item() / solve_times.mean().item())),
+            "Avg. solution length:    %.2f" % solve_lengths.mean(),
             "Solution length 95 %% CI: +/- %.2f" % (z() * solve_lengths.std() / math.sqrt(len(solve_lengths))),
             sep="\n    ",
         )
