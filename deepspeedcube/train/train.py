@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import ctypes
+import os
 
 import numpy as np
 import torch
@@ -31,6 +32,7 @@ def save_and_plot(loc: str, train_cfg: TrainConfig, model_cfg: ModelConfig, trai
 
     log.section("Plotting")
     with TT.profile("Plot"):
+        os.makedirs(f"{loc}/plots-train", exist_ok=True)
         plot_loss(loc, train_cfg, train_results)
         plot_lr(loc, train_cfg, train_results)
         plot_value_estimates(loc, train_cfg, train_results)
