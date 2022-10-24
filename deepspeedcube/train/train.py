@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import ctypes
 import os
+from copy import deepcopy
 
 import numpy as np
 import torch
@@ -20,6 +21,15 @@ from deepspeedcube.model.generator_network import clone_model, update_generator_
 from deepspeedcube.plot.plot_training import plot_loss, plot_lr, plot_value_estimates
 from deepspeedcube.train import TrainConfig, TrainResults
 
+
+def log_tt():
+    tt = deepcopy(TT)
+    while True:
+        try:
+            tt.end_profile()
+        except IndexError:
+            break
+    log("Time distribution", tt)
 
 def save_and_plot(loc: str, train_cfg: TrainConfig, model_cfg: ModelConfig, train_results: TrainResults, models: list[Model]):
     with TT.profile("Save"):
@@ -209,6 +219,7 @@ def train(job: JobDescription):
         if i in save_and_plot_batches:
             log.section("Saving")
             save_and_plot(job.location, train_cfg, model_cfg, train_results, models)
+            log_tt()
 
         TT.profile("Batch")
         log("Batch %i / %i" % (i+1, train_cfg.batches))
@@ -369,3 +380,4 @@ def train(job: JobDescription):
         LIBDSC.values_free(known_states_map_p)
 
     save_and_plot(job.location, train_cfg, model_cfg, train_results, models)
+    log_tt()

@@ -49,6 +49,5 @@ if __name__ == "__main__":
             )
             log("OMP_NUM_THREADS = %s" % os.environ.get("OMP_NUM_THREADS"), with_info=False)
             train(job)
-            log("Time distribution", TT)
 
     parser.document()
