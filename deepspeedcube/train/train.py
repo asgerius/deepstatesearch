@@ -31,14 +31,15 @@ def log_tt():
             break
     log("Time distribution", tt)
 
-def save_and_plot(loc: str, train_cfg: TrainConfig, model_cfg: ModelConfig, train_results: TrainResults, models: list[Model]):
+def save_and_plot(loc: str, train_cfg: TrainConfig, model_cfg: ModelConfig, train_results: TrainResults, models: list[Model], gen_models: list[Model]):
     with TT.profile("Save"):
         train_cfg.save(loc)
         model_cfg.save(loc)
         train_results.save(loc)
 
-        for i, model in enumerate(models):
+        for i, (model, gen_model) in enumerate(zip(models, gen_models)):
             torch.save(model.state_dict(), f"{loc}/model-{i}.pt")
+            torch.save(gen_model.state_dict(), f"{loc}/gen-model-{i}.pt")
 
     log.section("Plotting")
     with TT.profile("Plot"):
@@ -114,12 +115,15 @@ def train(job: JobDescription):
     for i in range(train_cfg.num_models):
         TT.profile("Build model")
         model = Model(model_cfg).to(device)
+        gen_model = Model(model_cfg).to(device)
+        gen_model.eval()
         if job.resume:
             sd = torch.load(f"{job.location}/model-{i}.pt", map_location=device)
             model.load_state_dict(sd)
-        gen_model = Model(model_cfg).to(device)
-        gen_model.eval()
-        clone_model(model, gen_model)
+            gen_sd = torch.load(f"{job.location}/gen-model-{i}.pt", map_location=device)
+            gen_model.load_state_dict(gen_sd)
+        else:
+            clone_model(model, gen_model)
         optimizer = optim.AdamW(model.parameters(), lr=train_cfg.lr, weight_decay=train_cfg.weight_decay)
         scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=train_cfg.batches)
         scaler = amp.grad_scaler.GradScaler() if train_cfg.fp16 else None
@@ -218,7 +222,7 @@ def train(job: JobDescription):
 
         if i in save_and_plot_batches:
             log.section("Saving")
-            save_and_plot(job.location, train_cfg, model_cfg, train_results, models)
+            save_and_plot(job.location, train_cfg, model_cfg, train_results, models, gen_models)
             log_tt()
 
         TT.profile("Batch")
@@ -379,5 +383,5 @@ def train(job: JobDescription):
     if train_cfg.known_states_depth:
         LIBDSC.values_free(known_states_map_p)
 
-    save_and_plot(job.location, train_cfg, model_cfg, train_results, models)
+    save_and_plot(job.location, train_cfg, model_cfg, train_results, models, gen_models)
     log_tt()
