@@ -72,6 +72,7 @@ def train(job: JobDescription):
             batch_size          = job.batch_size,
             K                   = job.k,
             lr                  = job.lr,
+            gamma               = job.gamma,
             tau                 = job.tau,
             tau_every           = job.tau_every,
             weight_decay        = job.weight_decay,
@@ -90,7 +91,6 @@ def train(job: JobDescription):
     log("Evaluating at batches", sorted(eval_batches))
     save_and_plot_batches = evenly_spaced_index(train_cfg.batches, 20000)
     log("Saving and plotting at batches", sorted(save_and_plot_batches))
-
 
     log.section("Building models")
     if job.resume:
@@ -125,7 +125,7 @@ def train(job: JobDescription):
         else:
             clone_model(model, gen_model)
         optimizer = optim.AdamW(model.parameters(), lr=train_cfg.lr, weight_decay=train_cfg.weight_decay)
-        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=train_cfg.batches)
+        scheduler = optim.lr_scheduler.StepLR(optimizer, 1, gamma=train_cfg.gamma)
         scaler = amp.grad_scaler.GradScaler() if train_cfg.fp16 else None
 
         models.append(model)

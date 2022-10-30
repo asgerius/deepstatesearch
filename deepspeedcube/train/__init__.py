@@ -13,6 +13,7 @@ class TrainConfig(DataStorage, json_name="train_config.json", indent=4):
     batch_size:         int
     K:                  int
     lr:                 float
+    gamma:              float
     tau:                float
     tau_every:          int
     weight_decay:       float
