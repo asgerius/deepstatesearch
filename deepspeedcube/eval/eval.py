@@ -128,7 +128,27 @@ def eval(job: JobDescription):
         eval_cfg.num_states = len(states)
     else:
         log("Generating random states")
+        # Code to load DCA states for SP24
+        # import json
+        # with open("../states.json") as f:
+        #     s = json.load(f)
+        # states = torch.tensor(s["states"], dtype=env.dtype)
+        # states = torch.concat((torch.zeros(len(states), 3, dtype=env.dtype), states), dim=1)
+        # states[:, 2] = 5
+        # y, x = torch.where(states == 0)
+        # x = x[2::3]
+        # # states[:, 0] = (x - 3) // 5
+        # # states[:, 1] = (x - 3) % 5
+        # eval_cfg.depths = s["scrambles"]
+        # preds = models[0](env.multiple_oh(states.to(device)))
+        # log("mu, sigma = %.2f, %.2f" % (preds.mean(), preds.std()))
         states, eval_cfg.depths = gen_eval_states(env, eval_cfg.num_states, eval_cfg.min_scrambles, eval_cfg.max_scrambles)
+        preds = models[0](env.multiple_oh(states.to(device)))
+        log.debug(
+            "Predicted mean and std. of cost-to-go of evaluation states",
+            "Mean: %.2f" % preds.mean(),
+            "Std.: %.2f" % preds.std(),
+        )
     log.debug("Evaluation depths: %s" % eval_cfg.depths)
 
     for i, state in enumerate(states):

@@ -68,7 +68,7 @@ class Environment(abc.ABC):
         return F.one_hot(
             state.long(),
             num_classes=cls.state_oh_size // len(cls._solved_state),
-        ).astype(torch.float32).view(1, -1)
+        ).to(torch.float32).view(1, -1)
 
     @classmethod
     def multiple_oh(cls, states: torch.Tensor) -> torch.Tensor:

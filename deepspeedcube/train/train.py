@@ -116,7 +116,6 @@ def train(job: JobDescription):
         TT.profile("Build model")
         model = Model(model_cfg).to(device)
         gen_model = Model(model_cfg).to(device)
-        gen_model.eval()
         if job.resume:
             sd = torch.load(f"{job.location}/model-{i}.pt", map_location=device)
             model.load_state_dict(sd)
@@ -124,6 +123,7 @@ def train(job: JobDescription):
             gen_model.load_state_dict(gen_sd)
         else:
             clone_model(model, gen_model)
+        gen_model.eval()
         optimizer = optim.AdamW(model.parameters(), lr=train_cfg.lr, weight_decay=train_cfg.weight_decay)
         scheduler = optim.lr_scheduler.StepLR(optimizer, 1, gamma=train_cfg.gamma)
         scaler = amp.grad_scaler.GradScaler() if train_cfg.fp16 else None
@@ -134,6 +134,7 @@ def train(job: JobDescription):
         schedulers.append(scheduler)
         scalers.append(scaler)
         TT.end_profile()
+
     log(
         "Built %i models" % train_cfg.num_models,
         "Parameters per model: %s" % thousands_seperators(models[0].numel()),
@@ -211,9 +212,13 @@ def train(job: JobDescription):
                 preds = preds / len(models)
 
                 for j in range(train_cfg.K):
+                    preds_depth = preds[depths == j + 1]
                     train_results.value_estimations[j].append(
-                        preds[depths == j + 1].mean().item()
+                        preds_depth.mean().item()
                     )
+                    log.debug("Depth %i: mean = %.2f, std. = %.2f" % (
+                        j + 1, preds_depth.mean().item(), preds_depth.std().item()
+                    ))
 
             for model in models:
                 model.train()
@@ -327,7 +332,9 @@ def train(job: JobDescription):
                 with TT.profile("Forward pass"):
                     preds = model(states_oh).squeeze()
                     cuda_sync()
-                loss = criterion(preds, targets)
+                with TT.profile("Loss"):
+                    loss = criterion(preds, targets)
+                    cuda_sync()
                 with TT.profile("Backwards propagation"):
                     if train_cfg.fp16:
                         scalers[j].scale(loss).backward()
