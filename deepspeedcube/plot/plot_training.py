@@ -12,8 +12,11 @@ def plot_loss(loc: str, cfg: TrainConfig, res: TrainResults):
     with plots.Figure(f"{loc}/plots-train/loss.png"):
         losses = np.array(res.losses)
         mean_loss = losses.mean(axis=0)
-        plt.plot(mean_loss, c=plots.tab_colours[0])
-        plt.plot(losses.T, alpha=0.5, c=plots.tab_colours[0])
+        x = np.arange(len(mean_loss)) + 1
+        plt.plot(x, mean_loss, c="gray", alpha=0.4, label="Loss")
+        plt.plot(*plots.moving_avg(x, mean_loss, neighbors=10), label="Smoothed loss")
+        # plt.plot(losses.T, alpha=0.5, c=plots.tab_colours[0])
+        plt.legend()
         plt.yscale("log")
         plt.grid()
         plt.xlabel("Batch")
@@ -34,7 +37,7 @@ def plot_value_estimates(loc: str, cfg: TrainConfig, res: TrainResults):
         plt.grid()
         plt.xlabel("Batch")
         plt.ylabel("Avg. value estimate")
-        plt.legend(loc="upper left")
+        plt.legend(loc="lower center", ncol=3)
 
 def plot_lr(loc: str, cfg: TrainConfig, res: TrainResults):
     with plots.Figure(f"{loc}/plots-train/lr.png"):
