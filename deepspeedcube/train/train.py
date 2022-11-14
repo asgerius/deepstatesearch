@@ -234,6 +234,7 @@ def train(job: JobDescription):
         log("Batch %i / %i" % (i+1, train_cfg.batches))
 
         if i % batches_per_gen == 0 or i == first_batch:
+            TT.profile("Get training states")
             num_states = batches_per_gen * train_cfg.batch_size * train_cfg.num_models
             log(
                 "Generating states:",
@@ -268,7 +269,9 @@ def train(job: JobDescription):
                 *env.get_solved().shape,
             )
             log.debug("Size of states in bytes: %s" % thousands_seperators(tensor_size(all_states)))
+            TT.end_profile()
 
+        TT.profile("Update models")
         for j in range(train_cfg.num_models):
             log.debug("Training model %i / %i" % (j+1, train_cfg.num_models))
 
@@ -286,36 +289,36 @@ def train(job: JobDescription):
                 neighbour_states = all_neighbour_states[i % batches_per_gen, j]
                 neighbour_states_d = neighbour_states.to(device)
 
-            log.debug("Forward passing states")
-            TT.profile("Value estimates")
-            with TT.profile("OH neighbour states"):
-                neighbour_states_oh = env.multiple_oh(neighbour_states_d)
-                cuda_sync()
-            assert neighbour_states_d.is_contiguous() and neighbour_states_oh.is_contiguous()
+            with TT.profile("Value estimates"):
+                log.debug("Getting target values")
 
-            with TT.profile("Forward pass"), torch.no_grad(), amp.autocast() if train_cfg.fp16 else contextlib.ExitStack():
-                J = gen_model(neighbour_states_oh).squeeze()
-                cuda_sync()
-
-            if not train_cfg.known_states_depth:
-                with TT.profile("Set solved states to j = 0"):
-                    solved_states = env.multiple_is_solved_d(neighbour_states_d)
-                    J[solved_states] = 0
+                with TT.profile("OH neighbour states"):
+                    neighbour_states_oh = env.multiple_oh(neighbour_states_d)
                     cuda_sync()
-            J = J.view(len(states_d), len(env.action_space))
+                assert neighbour_states_d.is_contiguous() and neighbour_states_oh.is_contiguous()
 
-            with TT.profile("Calculate targets"):
-                # Set g to 1 for valid moves and effectively inf for invalid moves.
-                # Effectively the same as not including the moves, but allows
-                # for better and easier vectorization.
-                # Note: Do not use torch.inf, as 0 * torch.inf is nan.
-                g = (to_neighbour_actions_d == NULL_ACTION) \
-                    .to(torch.float) \
-                    .view(len(states_d), len(env.action_space))
-                g = g * 1e10 + 1
-                targets = torch.min(g + J, dim=1).values
-                cuda_sync()
-            TT.end_profile()
+                with TT.profile("Forward pass"), torch.no_grad(), amp.autocast() if train_cfg.fp16 else contextlib.ExitStack():
+                    J = gen_model(neighbour_states_oh).squeeze()
+                    cuda_sync()
+
+                if not train_cfg.known_states_depth:
+                    with TT.profile("Set solved states to j = 0"):
+                        solved_states = env.multiple_is_solved_d(neighbour_states_d)
+                        J[solved_states] = 0
+                        cuda_sync()
+                J = J.view(len(states_d), len(env.action_space))
+
+                with TT.profile("Calculate targets"):
+                    # Set g to 1 for valid moves and effectively inf for invalid moves.
+                    # Effectively the same as not including the moves, but allows
+                    # for better and easier vectorization.
+                    # Note: Do not use torch.inf, as 0 * torch.inf is nan.
+                    g = (to_neighbour_actions_d == NULL_ACTION) \
+                        .to(torch.float) \
+                        .view(len(states_d), len(env.action_space))
+                    g = g * 1e10 + 1
+                    targets = torch.min(g + J, dim=1).values
+                    cuda_sync()
 
             if train_cfg.known_states_depth:
                 with TT.profile("Set known state values"):
@@ -381,11 +384,14 @@ def train(job: JobDescription):
                 with TT.profile("Update generator network"):
                     update_generator_network(train_cfg.tau, gen_models[j], models[j])
 
+        TT.end_profile()
+
         log("Mean loss: %.4f" % (sum(ls[-1] for ls in train_results.losses) / train_cfg.num_models))
+
+        train_results.current_batch += 1
 
         TT.end_profile()
 
-        train_results.current_batch += 1
 
     if train_cfg.known_states_depth:
         LIBDSC.values_free(known_states_map_p)
