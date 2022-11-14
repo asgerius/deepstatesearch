@@ -152,7 +152,10 @@ def eval(job: JobDescription):
     log.debug("Evaluation depths: %s" % eval_cfg.depths)
 
     for i, state in enumerate(states):
-        log.debug("State %i / %i" % (i + 1, eval_cfg.num_states))
+        log.debug(
+            "State %i / %i" % (i + 1, eval_cfg.num_states),
+            state,
+        )
         actions, time, states_seen = solver.solve(state)
         did_solve = actions is not None and time <= eval_cfg.max_time
         results.num_solved += did_solve
