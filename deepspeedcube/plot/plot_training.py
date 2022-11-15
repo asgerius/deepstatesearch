@@ -14,7 +14,11 @@ def plot_loss(loc: str, cfg: TrainConfig, res: TrainResults):
         mean_loss = losses.mean(axis=0)
         x = np.arange(len(mean_loss)) + 1
         plt.plot(x, mean_loss, c="gray", alpha=0.4, label="Loss")
-        plt.plot(*plots.moving_avg(x, mean_loss, neighbors=10), label="Smoothed loss")
+        try:
+            plt.plot(*plots.moving_avg(x, mean_loss, neighbors=10), label="Smoothed loss")
+        except ValueError:
+            # In case of empty
+            pass
         # plt.plot(losses.T, alpha=0.5, c=plots.tab_colours[0])
         plt.legend()
         plt.yscale("log")
