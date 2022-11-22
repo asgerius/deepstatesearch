@@ -110,19 +110,17 @@ size_t heap_extract_min(heap *heap_p, size_t n, float *keys, void *data) {
     return n;
 }
 
-void heap_insert(heap *heap_p, size_t n, const float *keys, const void *data) {
+void heap_insert(heap *heap_p, float key, const void *data) {
     /* Insert n elements into the heap. This function assumes that enough data has
     been allocated to the heap, which can be checked with heap_should_increase_alloc.
     If not, use heap_increase_alloc to double the amount of available memory. */
 
-    for (size_t i = 0; i < n; ++ i) {
-        heap_p->entries[heap_p->num_elems].key = keys[i];
-        heap_p->entries[heap_p->num_elems].data = data;
+    heap_p->entries[heap_p->num_elems].key = key;
+    heap_p->entries[heap_p->num_elems].data = data;
 
-        bubble_up(heap_p, heap_p->num_elems);
+    bubble_up(heap_p, heap_p->num_elems);
 
-        ++ heap_p->num_elems;
-    }
+    ++ heap_p->num_elems;
 }
 
 void heap_decrease_key(heap *heap_p, size_t index, float key) {

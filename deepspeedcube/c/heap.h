@@ -48,7 +48,7 @@ void heap_increase_alloc(heap *heap_p);
 given arrays in order of ascending keys. */
 size_t heap_extract_min(heap *heap_p, size_t n, float *keys, void *data);
 
-void heap_insert(heap *heap_p, size_t n, const float *keys, const void *data);
+void heap_insert(heap *heap_p, float key, const void *data);
 
 void heap_decrease_key(heap *heap_p, size_t index, float key);
 

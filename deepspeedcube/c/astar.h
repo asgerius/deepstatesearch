@@ -15,8 +15,7 @@
 
 struct node {
     action arrival_action;  // The action taken to get to this state
-    float f;
-    size_t g;
+    float g;
     size_t state_size;
     void *state;
     uint64_t hash;
@@ -24,7 +23,7 @@ struct node {
 
 struct astar_search {
     float lambda;
-    size_t longest_path;  // Longest path from the initial node to any node
+    float longest_path;  // Longest path from the initial node to any node
     size_t state_size;
     struct hashmap *node_map;
     heap *frontier;
