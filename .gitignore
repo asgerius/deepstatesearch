@@ -6,7 +6,7 @@ local_*
 *.out
 .python-version
 out/
-configs/
+local-configs/
 benchmark-results*/
 job.sh
 jobs/
