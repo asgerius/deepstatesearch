@@ -53,8 +53,8 @@ def gen_eval_states(env: Environment, num_states: int, min_scrambles: int, max_s
     return states, depths
 
 def get_batches_per_gen(env: Environment, batch_size: int) -> int:
-    # Only generate up to 20 GB of states, though no more than half the available memory
-    available_memory = 10 * 10 ** 9
+    # Only generate up to 10 GB of states, though no more than half the available memory
+    available_memory = 10 * 2 ** 30
     if available_memory > (max_mem := psutil.virtual_memory().total / 2):
         available_memory = max_mem
 

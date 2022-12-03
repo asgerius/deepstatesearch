@@ -4,13 +4,12 @@ local_*
 *.tmp
 *.DS_Store
 *.out
+*.png
 .python-version
 out/
 local-configs/
 benchmark-results*/
-job.sh
 jobs/
-*.png
 deepstatesearch/comparison
 
 # Latex

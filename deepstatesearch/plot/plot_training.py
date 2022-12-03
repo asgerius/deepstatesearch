@@ -16,10 +16,8 @@ def plot_loss(loc: str, cfg: TrainConfig, res: TrainResults):
         plt.plot(x, mean_loss, c="gray", alpha=0.4, label="Loss")
         try:
             plt.plot(*plots.moving_avg(x, mean_loss, neighbors=10), label="Smoothed loss")
-        except ValueError:
-            # In case of empty
+        except ValueError:  # In case of empty
             pass
-        # plt.plot(losses.T, alpha=0.5, c=plots.tab_colours[0])
         plt.legend()
         plt.yscale("log")
         plt.grid()

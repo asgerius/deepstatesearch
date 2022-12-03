@@ -287,7 +287,6 @@ class _SlidingPuzzle48(_SlidingPuzzle, size=7):
 class _SlidingPuzzle63(_SlidingPuzzle, size=8):
     pass
 
-
 _ENVS = {
     "cube": _CubeEnvironment,
     "sp15": _SlidingPuzzle15,

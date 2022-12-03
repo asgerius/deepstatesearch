@@ -191,6 +191,7 @@ def train(job: JobDescription):
                 scheduler.step()
 
     first_batch = train_results.current_batch
+
     for i in range(first_batch, train_cfg.batches):
 
         if i in eval_batches:
@@ -391,7 +392,6 @@ def train(job: JobDescription):
         train_results.current_batch += 1
 
         TT.end_profile()
-
 
     if train_cfg.known_states_depth:
         LIBDSC.values_free(known_states_map_p)

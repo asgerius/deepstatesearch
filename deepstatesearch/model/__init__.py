@@ -97,4 +97,3 @@ class _ResidualBlock(_BaseModel):
         x = fx + x
         x = self.output_transform(x)
         return x
-
