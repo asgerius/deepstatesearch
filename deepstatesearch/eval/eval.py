@@ -10,13 +10,13 @@ from pelutils import DataStorage, log, TT, thousands_seperators
 from pelutils.parser import JobDescription
 from pelutils.ds.stats import z
 
-from deepspeedcube import device
-from deepspeedcube.envs import get_env
-from deepspeedcube.envs.gen_states import gen_eval_states
-from deepspeedcube.eval.load_hard_cube_states import load_cube_eval_states
-from deepspeedcube.eval.solver import AStar, GreedyValueSolver
-from deepspeedcube.model import ModelConfig, Model
-from deepspeedcube.train.train import TrainConfig
+from deepstatesearch import device
+from deepstatesearch.envs import get_env
+from deepstatesearch.envs.gen_states import gen_eval_states
+from deepstatesearch.eval.load_hard_cube_states import load_cube_eval_states
+from deepstatesearch.eval.solver import AStar, GreedyValueSolver
+from deepstatesearch.model import ModelConfig, Model
+from deepstatesearch.train.train import TrainConfig
 
 
 @dataclass

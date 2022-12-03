@@ -11,10 +11,10 @@ import pelutils.ds.plots as plots
 import torch
 from pelutils import log, DataStorage, TT, thousands_seperators
 
-from deepspeedcube import device, HardwareInfo
-from deepspeedcube.benchmarks import savedir
-from deepspeedcube.envs import get_env
-from deepspeedcube.envs.gen_states import gen_new_states
+from deepstatesearch import device, HardwareInfo
+from deepstatesearch.benchmarks import savedir
+from deepstatesearch.envs import get_env
+from deepstatesearch.envs.gen_states import gen_new_states
 
 
 cuda = torch.cuda.is_available()

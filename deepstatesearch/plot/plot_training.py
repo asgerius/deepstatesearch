@@ -5,7 +5,7 @@ import numpy as np
 import pelutils.ds.plots as plots
 from pelutils import log
 
-from deepspeedcube.train import TrainConfig, TrainResults
+from deepstatesearch.train import TrainConfig, TrainResults
 
 
 def plot_loss(loc: str, cfg: TrainConfig, res: TrainResults):

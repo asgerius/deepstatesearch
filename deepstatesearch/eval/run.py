@@ -5,8 +5,8 @@ import os
 from pelutils import log, TT, LogLevels
 from pelutils.parser import Parser, Flag, Option
 
-from deepspeedcube import HardwareInfo
-from deepspeedcube.eval.eval import eval
+from deepstatesearch import HardwareInfo
+from deepstatesearch.eval.eval import eval
 
 
 options = (

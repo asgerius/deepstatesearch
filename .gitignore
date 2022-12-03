@@ -11,7 +11,7 @@ benchmark-results*/
 job.sh
 jobs/
 *.png
-deepspeedcube/comparison
+deepstatesearch/comparison
 
 # Latex
 *.aux

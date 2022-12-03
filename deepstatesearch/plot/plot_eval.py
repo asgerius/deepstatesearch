@@ -7,7 +7,7 @@ import numpy as np
 import pelutils.ds.plots as plots
 from pelutils import log
 
-from deepspeedcube.eval.eval import EvalConfig, EvalResults
+from deepstatesearch.eval.eval import EvalConfig, EvalResults
 
 
 def plot_solve_rate_time(loc: str, cfg: EvalConfig, res: EvalResults):

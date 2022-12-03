@@ -5,8 +5,8 @@ import os
 from pelutils import log, TT
 from pelutils.parser import Flag, Option, Parser
 
-from deepspeedcube import HardwareInfo
-from deepspeedcube.train.train import train
+from deepstatesearch import HardwareInfo
+from deepstatesearch.train.train import train
 
 
 options = (

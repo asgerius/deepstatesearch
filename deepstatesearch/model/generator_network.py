@@ -1,4 +1,4 @@
-from deepspeedcube.model import Model
+from deepstatesearch.model import Model
 
 
 def update_generator_network(tau: float, generator: Model, net: Model):

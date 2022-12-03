@@ -8,9 +8,9 @@ import torch
 import torch.cuda.amp as amp
 from pelutils import TickTock, TT
 
-from deepspeedcube import device, LIBDSC, ptr, tensor_size
-from deepspeedcube.envs import Environment
-from deepspeedcube.model import Model
+from deepstatesearch import device, LIBDSC, ptr, tensor_size
+from deepstatesearch.envs import Environment
+from deepstatesearch.model import Model
 
 
 class Solver(abc.ABC):

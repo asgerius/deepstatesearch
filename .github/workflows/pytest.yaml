@@ -33,4 +33,4 @@ jobs:
           echo $PYTHONPATH
           ls
           ls lib
-          pytest --cov deepspeedcube
+          pytest --cov deepstatesearch

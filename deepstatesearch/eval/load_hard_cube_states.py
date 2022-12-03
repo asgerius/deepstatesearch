@@ -4,7 +4,7 @@ from typing import Type
 
 import torch
 
-from deepspeedcube.envs import get_env
+from deepstatesearch.envs import get_env
 
 
 _env = get_env("cube")

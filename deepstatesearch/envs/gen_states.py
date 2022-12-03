@@ -7,8 +7,8 @@ import psutil
 import torch
 from pelutils import TT, log, thousands_seperators
 
-from deepspeedcube import device, tensor_size
-from deepspeedcube.envs import Environment
+from deepstatesearch import device, tensor_size
+from deepstatesearch.envs import Environment
 
 
 def gen_new_states(env: Environment, num_states: int, K: int) -> tuple[torch.Tensor, torch.Tensor]:

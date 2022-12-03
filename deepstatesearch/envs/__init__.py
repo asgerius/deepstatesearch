@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from deepspeedcube import device, ptr, tensor_size, LIBDSC
+from deepstatesearch import device, ptr, tensor_size, LIBDSC
 
 
 NULL_ACTION = 255

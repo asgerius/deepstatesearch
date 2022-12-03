@@ -2,7 +2,7 @@ import random
 
 import torch
 
-from deepspeedcube.envs import get_env
+from deepstatesearch.envs import get_env
 
 
 env = get_env("cube")

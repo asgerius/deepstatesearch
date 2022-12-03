@@ -13,13 +13,13 @@ import torch.optim as optim
 from pelutils import log, thousands_seperators, TT
 from pelutils.parser import JobDescription
 
-from deepspeedcube import LIBDSC, device, ptr, tensor_size
-from deepspeedcube.model import Model, ModelConfig
-from deepspeedcube.envs import NULL_ACTION, get_env
-from deepspeedcube.envs.gen_states import gen_new_states, get_batches_per_gen
-from deepspeedcube.model.generator_network import clone_model, update_generator_network
-from deepspeedcube.plot.plot_training import plot_loss, plot_lr, plot_value_estimates
-from deepspeedcube.train import TrainConfig, TrainResults
+from deepstatesearch import LIBDSC, device, ptr, tensor_size
+from deepstatesearch.model import Model, ModelConfig
+from deepstatesearch.envs import NULL_ACTION, get_env
+from deepstatesearch.envs.gen_states import gen_new_states, get_batches_per_gen
+from deepstatesearch.model.generator_network import clone_model, update_generator_network
+from deepstatesearch.plot.plot_training import plot_loss, plot_lr, plot_value_estimates
+from deepstatesearch.train import TrainConfig, TrainResults
 
 
 def log_tt():

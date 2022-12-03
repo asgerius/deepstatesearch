@@ -22,14 +22,14 @@ all:
 
 lib/libdsc.so:
 	$(CC) -o $@ \
-		deepspeedcube/c/hashmap.c/hashmap.c deepspeedcube/c/values.c \
-		deepspeedcube/c/astar.c deepspeedcube/c/heap.c deepspeedcube/c/unique.c \
-		deepspeedcube/c/envs/envs.c deepspeedcube/c/envs/cube.c deepspeedcube/c/envs/sliding.c \
+		deepstatesearch/c/hashmap.c/hashmap.c deepstatesearch/c/values.c \
+		deepstatesearch/c/astar.c deepstatesearch/c/heap.c deepstatesearch/c/unique.c \
+		deepstatesearch/c/envs/envs.c deepstatesearch/c/envs/cube.c deepstatesearch/c/envs/sliding.c \
 		$(CFLAGS) $(CSHARED)
 
 lib/cube_cuda.so:
 	$(CXX) $(OPT) $(ARCH) $(XOPTS) -Xcompiler "-fPIC" -dc \
-		deepspeedcube/cuda/envs/cube.cu \
+		deepstatesearch/cuda/envs/cube.cu \
 		-o lib/cube_cuda.o
 	$(CXX) $(ARCH) $(XOPTS) -Xcompiler "-fPIC" -dlink \
 		lib/cube_cuda.o \
