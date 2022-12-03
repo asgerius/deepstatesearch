@@ -1,9 +1,7 @@
-matplotlib>=3.5
-numpy>=1.21
-scipy>=1.5
-torch>=1.10
+matplotlib==3.5.1
+numpy==1.19.5
+torch==1.11.0
 
-pelutils>=1.1
-py-cpuinfo>=8
-psutil>=5.8
-tqdm>=4.64
+pelutils[ds]==1.1.0
+py-cpuinfo==8.0.0
+psutil==5.9.0
