@@ -15,12 +15,12 @@ CUDA_PATH = /appl/cuda/11.5.1
 all:
 	make clean
 	mkdir -p lib/envs
-	make lib/libdsc.so
+	make lib/libdss.so
 	@if command -v nvcc ; then\
 		make lib/cube_cuda.so;\
 	fi
 
-lib/libdsc.so:
+lib/libdss.so:
 	$(CC) -o $@ \
 		deepstatesearch/c/hashmap.c/hashmap.c deepstatesearch/c/values.c \
 		deepstatesearch/c/astar.c deepstatesearch/c/heap.c deepstatesearch/c/unique.c \

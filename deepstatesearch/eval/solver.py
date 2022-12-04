@@ -8,7 +8,7 @@ import torch
 import torch.cuda.amp as amp
 from pelutils import TickTock, TT
 
-from deepstatesearch import device, LIBDSC, ptr, tensor_size
+from deepstatesearch import device, LIBDSS, ptr, tensor_size
 from deepstatesearch.envs import Environment
 from deepstatesearch.model import Model
 
@@ -104,18 +104,18 @@ class AStar(Solver):
         TT.profile("A*")
 
         with TT.profile("Allocate"):
-            search_state_p = ctypes.c_void_p(LIBDSC.astar_init(
+            search_state_p = ctypes.c_void_p(LIBDSS.astar_init(
                 ctypes.c_float(self.l),
                 ctypes.c_size_t(self.d),
                 ctypes.c_size_t(tensor_size(state)),
             ))
-            frontier_p = ctypes.c_void_p(LIBDSC.astar_frontier_ptr(search_state_p))
+            frontier_p = ctypes.c_void_p(LIBDSS.astar_frontier_ptr(search_state_p))
 
         # Insert initial state into frontier and node map
         h = self.h(state.unsqueeze(0).to(device))[0].item()
 
         with TT.profile("Add initial state"):
-            LIBDSC.astar_add_initial_state(h, ptr(state), search_state_p)
+            LIBDSS.astar_add_initial_state(h, ptr(state), search_state_p)
 
         solved = False
 
@@ -132,15 +132,15 @@ class AStar(Solver):
 
             # Make sure there is enough space in the heap, as astar_iteration
             # usually adds new states without allocating more memory
-            while LIBDSC.heap_should_increase_alloc(frontier_p, ctypes.c_size_t(len(neighbour_states))):
+            while LIBDSS.heap_should_increase_alloc(frontier_p, ctypes.c_size_t(len(neighbour_states))):
                 with TT.profile("Expand frontier"):
-                    LIBDSC.heap_increase_alloc(frontier_p)
+                    LIBDSS.heap_increase_alloc(frontier_p)
 
             with TT.profile("Check for solution"):
                 any_solved = self.env.multiple_is_solved_d(neighbour_states_d).any()
             if any_solved:
                 with TT.profile("Solve cleanup"):
-                    longest_path = LIBDSC.astar_longest_path(search_state_p) + 1
+                    longest_path = LIBDSS.astar_longest_path(search_state_p) + 1
                     actions = torch.empty(longest_path, dtype=torch.uint8)
                     solved_state_index = torch.where(self.env.multiple_is_solved(neighbour_states))[0][0].item()
                     actions[0] = solved_state_index % len(self.env.action_space)
@@ -152,7 +152,7 @@ class AStar(Solver):
             h = self.h(neighbour_states_d)
 
             with TT.profile("Update search state"):
-                LIBDSC.astar_iteration(
+                LIBDSS.astar_iteration(
                     ctypes.c_size_t(len(current_states)),
                     ptr(current_states),
                     ctypes.c_size_t(len(neighbour_states)),
@@ -168,7 +168,7 @@ class AStar(Solver):
             with TT.profile("Retrace path"):
                 # Solved state has not been added, so add 1 to maximum solution length
                 reverse_actions = self.env.reverse_moves(self.env.action_space)
-                num_actions = LIBDSC.astar_retrace_path(
+                num_actions = LIBDSS.astar_retrace_path(
                     len(self.env.action_space),
                     ptr(actions),
                     ptr(reverse_actions),
@@ -178,10 +178,10 @@ class AStar(Solver):
                 )
                 actions = actions[:num_actions].flip(0)
 
-        states_seen = LIBDSC.astar_num_states(search_state_p)
+        states_seen = LIBDSS.astar_num_states(search_state_p)
 
         with TT.profile("Free memory"):
-            LIBDSC.astar_free(search_state_p)
+            LIBDSS.astar_free(search_state_p)
 
         TT.end_profile()
 
@@ -193,7 +193,7 @@ class AStar(Solver):
     def extract_min(self, frontier_p: ctypes.c_void_p) -> torch.Tensor:
         keys_arr = torch.empty((self.N, ), dtype=torch.float)
         data_arr = torch.empty((self.N, *self.env.state_shape), dtype=self.env.dtype)
-        num_extracted = LIBDSC.heap_extract_min(frontier_p, self.N, ptr(keys_arr), ptr(data_arr))
+        num_extracted = LIBDSS.heap_extract_min(frontier_p, self.N, ptr(keys_arr), ptr(data_arr))
         return keys_arr[:num_extracted], data_arr[:num_extracted]
 
     @torch.no_grad()

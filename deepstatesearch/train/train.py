@@ -13,7 +13,7 @@ import torch.optim as optim
 from pelutils import log, thousands_seperators, TT
 from pelutils.parser import JobDescription
 
-from deepstatesearch import LIBDSC, device, ptr, tensor_size
+from deepstatesearch import LIBDSS, device, ptr, tensor_size
 from deepstatesearch.model import Model, ModelConfig
 from deepstatesearch.envs import NULL_ACTION, get_env
 from deepstatesearch.envs.gen_states import gen_new_states, get_batches_per_gen
@@ -175,7 +175,7 @@ def train(job: JobDescription):
 
         log("Inserting known states into map")
         with TT.profile("Insert known states"):
-            known_states_map_p = ctypes.c_void_p(LIBDSC.values_node_map_from_states(
+            known_states_map_p = ctypes.c_void_p(LIBDSS.values_node_map_from_states(
                 len(known_states), env.state_size,
                 ptr(known_states), len(env.action_space),
             ))
@@ -324,7 +324,7 @@ def train(job: JobDescription):
             if train_cfg.known_states_depth:
                 with TT.profile("Set known state values"):
                     targets_cpu = targets.cpu()
-                    LIBDSC.values_set(len(targets_cpu), env.state_size, ptr(states), ptr(targets_cpu), known_states_map_p)
+                    LIBDSS.values_set(len(targets_cpu), env.state_size, ptr(states), ptr(targets_cpu), known_states_map_p)
                     targets = targets_cpu.to(device)
 
             with TT.profile("OH states"):
@@ -394,7 +394,7 @@ def train(job: JobDescription):
         TT.end_profile()
 
     if train_cfg.known_states_depth:
-        LIBDSC.values_free(known_states_map_p)
+        LIBDSS.values_free(known_states_map_p)
 
     save_and_plot(job.location, train_cfg, model_cfg, train_results, models, gen_models)
     log_tt()

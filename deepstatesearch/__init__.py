@@ -12,17 +12,17 @@ import torch
 cpu = torch.device("cpu")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-LIBDSC = ctypes.cdll.LoadLibrary("lib/libdsc.so")
+LIBDSS = ctypes.cdll.LoadLibrary("lib/libdss.so")
 
-LIBDSC.heap_extract_min.restype = ctypes.c_size_t
-LIBDSC.astar_init.restype = ctypes.c_void_p
-LIBDSC.astar_frontier_ptr.restype = ctypes.c_void_p
-LIBDSC.astar_longest_path.restype = ctypes.c_size_t
-LIBDSC.astar_retrace_path.restype = ctypes.c_size_t
-LIBDSC.astar_num_states.restype = ctypes.c_size_t
-LIBDSC.values_node_map_from_states.restype = ctypes.c_void_p
+LIBDSS.heap_extract_min.restype = ctypes.c_size_t
+LIBDSS.astar_init.restype = ctypes.c_void_p
+LIBDSS.astar_frontier_ptr.restype = ctypes.c_void_p
+LIBDSS.astar_longest_path.restype = ctypes.c_size_t
+LIBDSS.astar_retrace_path.restype = ctypes.c_size_t
+LIBDSS.astar_num_states.restype = ctypes.c_size_t
+LIBDSS.values_node_map_from_states.restype = ctypes.c_void_p
 
-LIBDSC.astar_add_initial_state.argtypes = ctypes.c_float, ctypes.c_void_p, ctypes.c_void_p
+LIBDSS.astar_add_initial_state.argtypes = ctypes.c_float, ctypes.c_void_p, ctypes.c_void_p
 
 def ptr(arr: torch.Tensor) -> ctypes:
     return ctypes.c_void_p(arr.data_ptr())
@@ -40,7 +40,7 @@ def unique(x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
 
     numel_per_element = np.cumprod((*x.shape[1:], 1))[-1]
 
-    num_unique = LIBDSC.unique(
+    num_unique = LIBDSS.unique(
         ptr(x),
         ctypes.c_size_t(len(x)),
         ctypes.c_size_t(x.element_size() * numel_per_element),

@@ -2,6 +2,8 @@
 
 This repository contains the code used to produce the results for the paper "VERY GOOD PAPER NAME".
 
+[![pytest](https://github.com/asgerius/deepstatesearch/actions/workflows/pytest.yaml/badge.svg?branch=master)](https://github.com/asgerius/deepstatesearch/actions/workflows/pytest.yaml)
+
 ## Environment
 
 All experiments were run using

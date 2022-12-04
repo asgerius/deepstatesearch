@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from deepstatesearch import device, ptr, tensor_size, LIBDSC
+from deepstatesearch import device, ptr, tensor_size, LIBDSS
 
 
 NULL_ACTION = 255
@@ -102,7 +102,7 @@ class _CubeEnvironment(Environment):
     )
     _solved_state_d = _solved_state.to(device)
     state_size = tensor_size(_solved_state)
-    move_fn = LIBDSC.cube_act
+    move_fn = LIBDSS.cube_act
 
     # If the six sides are represented by an array, the order should be F, B, T, D, L, R
     F, B, T, D, L, R = 0, 1, 2, 3, 4, 5
@@ -135,7 +135,7 @@ class _CubeEnvironment(Environment):
     def multiple_moves(cls, actions: torch.Tensor, states: torch.Tensor, inplace=False) -> torch.Tensor:
         new_states = states if inplace else states.clone()
 
-        LIBDSC.cube_multi_act(
+        LIBDSS.cube_multi_act(
             ptr(new_states),
             ptr(actions),
             len(actions),
@@ -205,7 +205,7 @@ class _SlidingPuzzle(Environment):
     dtype = torch.int8
     action_space = torch.arange(4, dtype=torch.uint8)
 
-    move_fn = LIBDSC.sliding_act
+    move_fn = LIBDSS.sliding_act
 
     def __init_subclass__(cls, size: int):
         cls.size = ctypes.c_int(size)
@@ -221,7 +221,7 @@ class _SlidingPuzzle(Environment):
     def multiple_moves(cls, actions: torch.Tensor, states: torch.Tensor, inplace=False) -> torch.Tensor:
         states = states if inplace else states.clone()
 
-        LIBDSC.sliding_multi_act(
+        LIBDSS.sliding_multi_act(
             ptr(states),
             ptr(actions),
             ctypes.c_size_t(len(actions)),
@@ -232,7 +232,7 @@ class _SlidingPuzzle(Environment):
     @classmethod
     def neighbours(cls, states: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         actions, neighbour_states = super().neighbours(states)
-        LIBDSC.sliding_neighbours_set_null_actions(
+        LIBDSS.sliding_neighbours_set_null_actions(
             ptr(states),
             ptr(neighbour_states),
             ptr(actions),

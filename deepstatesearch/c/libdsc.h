@@ -1,5 +1,5 @@
-#ifndef LIBDSC_H
-#define LIBDSC_H
+#ifndef LIBDSS_H
+#define LIBDSS_H
 
 #include "astar.h"
 #include "heap.h"
