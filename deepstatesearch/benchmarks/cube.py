@@ -89,7 +89,7 @@ def plot():
     times = [1e9 * np.array(r.move_time) for r in res]
     times_inplace = [1e9 * np.array(r.move_time_inplace) for r in res]
 
-    with plots.Figure(f"{savedir}/cube-move.png", legend_fontsize=0.75):
+    with plots.Figure(f"{savedir}/cube-move.pdf", legend_fontsize=0.8, axes_ticksize=1):
         for i, r in enumerate(res):
             times = 1e9 * np.array(r.move_time).mean(axis=0)
             times_inplace = 1e9 * np.array(r.move_time_inplace).mean(axis=0)
@@ -109,7 +109,7 @@ def plot():
         plt.ylabel("Avg. move time [ns]")
         plt.legend(loc=1)
 
-    with plots.Figure(f"{savedir}/cube-gen.png", legend_fontsize=0.75):
+    with plots.Figure(f"{savedir}/cube-gen.pdf", legend_fontsize=0.75):
         for i, r in enumerate(res):
             times = 1e9 * np.array(r.scramble_time).mean(axis=0)
 
