@@ -7,7 +7,16 @@ import subprocess
 import cpuinfo
 import numpy as np
 import torch
+from pelutils import TickTock, TickTockException
 
+
+def _reset(self: TickTock):
+    """ Stops all timing and profiling. """
+    if self._profile_stack:
+        raise TickTockException("Cannot reset TickTock while profiling is active")
+    self.__init__()
+
+TickTock.reset = _reset
 
 cpu = torch.device("cpu")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
